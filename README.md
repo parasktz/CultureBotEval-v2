@@ -33,6 +33,22 @@ index.html  →  role.html  →  evaluator.html         →     evaluationlist2p
 | 10 | Needed Logical Steps | All · Mostly · Partially · Missing |
 
 ---
+CultureBotEval/
+├── index.html                      # Login 
+├── role.html                       # Αρχική με tabs: Create · Modify · Evaluation · Statistics · Admin 
+├── creator.html                    # Create — δυναμικό multi-LLM 
+├── modify.html                     # Modify — επεξεργασία/διαγραφή sessions 
+├── evaluator.html                  # Evaluation — λίστα Personas  
+├── evaluationlist4persona.html     # Sessions ανά Persona — multi-LLM εμφάνιση & inline edit 
+├── evaluation.html                 # Νέα αξιολόγηση — όλα τα LLMs + 10 κριτήρια/LLM 
+├── statistics.html                 # Landing reports (κείμενο 10 κριτήρια)  
+├── report-sessions.html            # iframe loader 
+├── report-criteria.html            # iframe loader 
+├── admin.html                      # buildFile1/buildFile2 multi-LLM aware  
+├── styles.css                      # stylesheet 
+├── config.js                       # Firebase config 
+├── reports/                        # Παράγονται από το admin (Generate & Push Both)
+└── .github/workflows/deploy.yml    # GitHub Pages auto-deploy 
 
 ## Firebase Data Structure:
 
