@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>CultureBotEval — Criteria Bar Charts</title>
+<script src="config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<style>
+:root{
+  --bg:#f4f3ee;--card:#fff;--border:rgba(0,0,0,.09);
+  --text:#18180f;--muted:#68685f;
+  --blue:#2b7fd4;--blue-bg:#e8f2fc;--blue-t:#0a3d6e;--r:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+     background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;}
+
+.topbar{background:var(--card);border-bottom:.5px solid var(--border);
+        padding:.8rem 2rem;display:flex;align-items:center;justify-content:space-between;
+        position:sticky;top:0;z-index:10;flex-shrink:0;}
+.topbar-left{display:flex;align-items:center;gap:10px;}
+.back{font-size:12px;color:var(--blue);text-decoration:none;}
+.back:hover{text-decoration:underline;}
+.topbar-logo{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;}
+.topbar-sep{color:var(--border);}
+.topbar-title{font-size:15px;font-weight:500;color:var(--blue-t);}
+.topbar-right{display:flex;align-items:center;gap:12px;}
+.user-pill{font-size:11px;background:var(--blue-bg);color:var(--blue-t);padding:3px 10px;border-radius:20px;}
+.signout{font-size:12px;color:var(--muted);cursor:pointer;border:none;background:none;
+         text-decoration:underline;font-family:inherit;}
+
+.screen{display:flex;flex-direction:column;align-items:center;justify-content:center;
+        flex:1;gap:14px;padding:2rem;text-align:center;}
+.spinner{width:28px;height:28px;border:2.5px solid var(--border);
+         border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.screen-icon{font-size:36px;}
+.screen-title{font-size:16px;font-weight:500;color:var(--text);}
+.screen-sub{font-size:13px;color:var(--muted);max-width:340px;line-height:1.6;}
+
+.login-box{background:var(--card);border:.5px solid var(--border);border-radius:var(--r);
+           padding:2rem 1.75rem;width:100%;max-width:340px;
+           box-shadow:0 4px 24px rgba(0,0,0,.06);}
+.login-box h3{font-size:16px;font-weight:500;color:var(--blue-t);margin-bottom:.3rem;text-align:center;}
+.login-box p{font-size:12px;color:var(--muted);margin-bottom:1.4rem;text-align:center;}
+.field{margin-bottom:.85rem;}
+.field label{display:block;font-size:11px;color:var(--muted);margin-bottom:3px;
+             text-transform:uppercase;letter-spacing:.05em;}
+.field input{width:100%;padding:.5rem .75rem;border:.5px solid var(--border);border-radius:6px;
+             background:var(--bg);color:var(--text);font-size:13px;outline:none;transition:border .15s;}
+.field input:focus{border-color:var(--blue);}
+.btn-login{width:100%;padding:.6rem;background:var(--blue);color:#fff;border:none;border-radius:6px;
+           font-size:13px;font-weight:500;cursor:pointer;transition:opacity .15s;}
+.btn-login:hover{opacity:.88;}
+.err{font-size:11px;color:#c0392b;margin-top:.6rem;min-height:16px;text-align:center;}
+
+.no-report-note{background:var(--blue-bg);border:.5px solid rgba(43,127,212,.2);
+                border-radius:8px;padding:.9rem 1.2rem;font-size:12px;
+                color:var(--blue-t);max-width:380px;line-height:1.6;}
+
+#frame-wrap{
+  display:none;
+  width:100%;
+  height:calc(100vh - 53px);
+  overflow:hidden;
+  flex-shrink:0;
+}
+iframe{
+  width:100%;
+  height:100%;
+  border:none;
+  display:block;
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <a class="back" href="statistics.html">← Back</a>
+    <span class="topbar-sep">|</span>
+    <span class="topbar-logo">CultureBotEval</span>
+    <span class="topbar-sep">|</span>
+    <span class="topbar-title">Criteria Bar Charts</span>
+  </div>
+  <div class="topbar-right">
+    <span class="user-pill" id="user-label" style="display:none;"></span>
+    <button class="signout" id="signout-btn" style="display:none;" onclick="doLogout()">Sign out</button>
+  </div>
+</div>
+
+<div class="screen" id="screen-loading">
+  <div class="spinner"></div>
+  <span style="font-size:13px;color:var(--muted);">Loading…</span>
+</div>
+
+<div class="screen" id="screen-login" style="display:none;">
+  <div class="login-box">
+    <h3>Sign In</h3>
+    <p>Access restricted to verified users</p>
+    <div class="field"><label>Email</label>
+      <input type="email" id="email" placeholder="you@example.com"
+             onkeydown="if(event.key==='Enter')doLogin()"/>
+    </div>
+    <div class="field"><label>Password</label>
+      <input type="password" id="pass" placeholder="••••••••"
+             onkeydown="if(event.key==='Enter')doLogin()"/>
+    </div>
+    <button class="btn-login" onclick="doLogin()">Sign In</button>
+    <div class="err" id="err"></div>
+  </div>
+</div>
+
+<div class="screen" id="screen-denied" style="display:none;">
+  <span class="screen-icon">🔒</span>
+  <div class="screen-title">Access Denied</div>
+  <div class="screen-sub">Your account does not have access to this report.
+    Contact the admin to request access.</div>
+</div>
+
+<div class="screen" id="screen-noreport" style="display:none;">
+  <span class="screen-icon">📭</span>
+  <div class="screen-title">No Report Available</div>
+  <div class="no-report-note">The admin has not generated this report yet.
+    Please check back later.</div>
+</div>
+
+<div id="frame-wrap">
+  <iframe id="report-frame" title="Criteria Bar Charts Report"></iframe>
+</div>
+
+<script>
+firebase.initializeApp(FIREBASE_CONFIG);
+const auth = firebase.auth();
+const db   = firebase.database();
+
+auth.onAuthStateChanged(async user => {
+  if(!user){ show('screen-login'); return; }
+
+  let allowed = false;
+
+  // 1. Check verified_creators by UID
+  try {
+    const snap = await db.ref('verified_creators/' + user.uid).once('value');
+    if(snap.exists()) allowed = true;
+  } catch(e){}
+
+  // 2. Scan verified_creators for matching email
+  if(!allowed){
+    try {
+      const snap = await db.ref('verified_creators').once('value');
+      const vc   = snap.val() || {};
+      Object.values(vc).forEach(v => {
+        if(v === true) return;
+        if(v && (v.email === user.email || v.uid === user.uid)) allowed = true;
+      });
+    } catch(e){}
+  }
+
+  // 3. Check admins (may throw for non-admins)
+  if(!allowed){
+    try {
+      const snap = await db.ref('admins/' + user.uid).once('value');
+      if(snap.exists()) allowed = true;
+    } catch(e){}
+  }
+
+  if(!allowed){ showUser(user.email); show('screen-denied'); return; }
+  showUser(user.email);
+  await loadReport();
+});
+
+async function loadReport(){
+  try{
+    const snap = await db.ref('latestReports/criteria').once('value');
+    const url  = snap.val();
+    if(!url){ show('screen-noreport'); return; }
+
+    console.log('[report-criteria] Fetching:', url);
+    const res  = await fetch(url);
+    if(!res.ok) throw new Error('HTTP ' + res.status + ' fetching ' + url);
+    const html = await res.text();
+
+    document.getElementById('report-frame').srcdoc = html;
+    document.getElementById('frame-wrap').style.display = 'block';
+    hide('screen-loading');
+  }catch(e){
+    console.error('[report-criteria] Load failed:', e);
+    show('screen-noreport');
+  }
+}
+
+async function doLogin(){
+  document.getElementById('err').textContent = '';
+  try{
+    await auth.signInWithEmailAndPassword(
+      document.getElementById('email').value,
+      document.getElementById('pass').value
+    );
+  }catch(e){
+    document.getElementById('err').textContent = e.message;
+  }
+}
+
+async function doLogout(){
+  await auth.signOut();
+  location.reload();
+}
+
+function show(id){
+  ['screen-loading','screen-login','screen-denied','screen-noreport'].forEach(s=>{
+    document.getElementById(s).style.display = s===id ? 'flex' : 'none';
+  });
+}
+function hide(id){ document.getElementById(id).style.display='none'; }
+function showUser(email){
+  document.getElementById('user-label').textContent   = email;
+  document.getElementById('user-label').style.display = 'inline-block';
+  document.getElementById('signout-btn').style.display= 'inline-block';
+}
+</script>
+</body>
+</html>

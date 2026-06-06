@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Persona Evaluation — Sign In</title>
+<link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+
+<div class="hdr">
+  <div>
+    <div class="hdr-title">Persona Evaluation System</div>
+    <div class="hdr-sub">Συνδέσου για να συνεχίσεις</div>
+  </div>
+</div>
+
+<div class="page-sm">
+
+  <div class="card" style="margin-top:1rem;">
+
+    <div style="text-align:center;margin-bottom:1.75rem;">
+      <div style="font-size:22px;margin-bottom:.4rem;">🔐</div>
+      <div style="font-size:18px;font-weight:500;margin-bottom:.25rem;">Σύνδεση</div>
+      <div style="font-size:13px;color:var(--muted);">
+        Χρησιμοποίησε τα στοιχεία που σου έδωσε ο διαχειριστής.
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="fl">Email</div>
+      <input class="fi" type="email" id="email"
+        placeholder="you@example.com"
+        autocomplete="email"/>
+    </div>
+
+    <div class="field">
+      <div class="fl">Κωδικός πρόσβασης</div>
+      <input class="fi" type="password" id="pass"
+        placeholder="••••••••"
+        autocomplete="current-password"/>
+    </div>
+
+    <div id="msg"></div>
+
+    <button class="btn pri full" id="btn-login" style="margin-top:1.25rem;">
+      Σύνδεση →
+    </button>
+
+  </div>
+
+  <div style="text-align:center;font-size:12px;color:var(--muted);margin-top:1rem;line-height:1.6;">
+    Δεν έχεις λογαριασμό;<br>
+    Επικοινώνησε με τον διαχειριστή της εφαρμογής.
+  </div>
+
+</div>
+
+<script src="config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script>
+firebase.initializeApp(FIREBASE_CONFIG);
+const auth = firebase.auth();
+
+// Already logged in → skip to role page
+auth.onAuthStateChanged(u => { if(u) location.href = 'role.html'; });
+
+const $ = id => document.getElementById(id);
+
+function setMsg(msg, type='n-err'){
+  $('msg').innerHTML = msg
+    ? `<div class="notice ${type}" style="margin-top:.85rem;">${msg}</div>`
+    : '';
+}
+
+function errText(code){
+  const map = {
+    'auth/user-not-found':    'Δεν βρέθηκε λογαριασμός με αυτό το email.',
+    'auth/wrong-password':    'Λάθος κωδικός πρόσβασης.',
+    'auth/invalid-email':     'Μη έγκυρη μορφή email.',
+    'auth/invalid-credential':'Λάθος email ή κωδικός πρόσβασης.',
+    'auth/too-many-requests': 'Πολλές αποτυχημένες προσπάθειες. Δοκίμασε ξανά σε λίγο.',
+    'auth/user-disabled':     'Αυτός ο λογαριασμός έχει απενεργοποιηθεί.',
+    'auth/network-request-failed': 'Πρόβλημα σύνδεσης δικτύου. Έλεγξε το internet σου.',
+  };
+  return map[code] || 'Σφάλμα σύνδεσης. Δοκίμασε ξανά.';
+}
+
+async function login(){
+  setMsg('');
+  const email = $('email').value.trim();
+  const pass  = $('pass').value;
+
+  if(!email || !pass){
+    setMsg('Συμπλήρωσε email και κωδικό.');
+    return;
+  }
+
+  const btn = $('btn-login');
+  btn.disabled    = true;
+  btn.textContent = 'Σύνδεση...';
+
+  try{
+    await auth.signInWithEmailAndPassword(email, pass);
+    location.href = 'role.html';
+  }catch(e){
+    setMsg(errText(e.code));
+    btn.disabled    = false;
+    btn.textContent = 'Σύνδεση →';
+  }
+}
+
+$('btn-login').addEventListener('click', login);
+$('email').addEventListener('keydown', e => { if(e.key === 'Enter') $('pass').focus(); });
+$('pass').addEventListener('keydown',  e => { if(e.key === 'Enter') login(); });
+</script>
+
+</body>
+</html>

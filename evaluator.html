@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Persona Evaluation — Evaluation</title>
+<link rel="stylesheet" href="styles.css"/>
+<style>
+.persona-grid{display:flex;flex-direction:column;gap:1rem;}
+.persona-card{
+  background:var(--card);
+  border:.5px solid var(--border);
+  border-radius:var(--r);
+  overflow:hidden;
+  transition:border-color .2s;
+}
+.persona-card:hover{border-color:var(--blue);}
+.pc-head{
+  padding:1.1rem 1.25rem;
+  display:flex;align-items:flex-start;
+  justify-content:space-between;gap:14px;flex-wrap:wrap;
+}
+.pc-num{
+  width:28px;height:28px;border-radius:50%;
+  background:var(--blue-bg);color:var(--blue-t);
+  font-size:12px;font-weight:600;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;margin-top:3px;
+}
+.pc-info{flex:1;min-width:0;}
+.pc-title{font-size:18px;font-weight:500;color:var(--text);margin-bottom:6px;}
+.pc-role{
+  font-size:12px;color:var(--blue-t);
+  background:var(--blue-bg);
+  border-radius:6px;padding:5px 11px;
+  display:inline-block;margin-bottom:6px;
+  line-height:1.55;max-width:100%;
+}
+.pc-meta{font-size:12px;color:var(--muted);line-height:1.7;margin-top:2px;}
+.pc-footer{
+  background:var(--bg);
+  border-top:.5px solid var(--border);
+  padding:.65rem 1.25rem;
+  display:flex;align-items:center;justify-content:space-between;
+  font-size:12px;color:var(--muted);flex-wrap:wrap;gap:8px;
+}
+.my-eval-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:11px;background:var(--green-bg);color:var(--green-t);
+  border-radius:4px;padding:2px 8px;
+}
+.sessions-count{
+  font-size:11px;color:var(--muted);
+}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <a href="role.html" style="font-size:13px;color:var(--muted);">← Πίσω</a>
+    <div>
+      <div class="hdr-title">Evaluation</div>
+      <div class="hdr-sub">Λίστα Personas</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <div class="avatar" id="av"></div>
+    <span class="hdr-email" id="umail"></span>
+    <button class="btn sm" id="btn-out">Έξοδος</button>
+  </div>
+</div>
+
+<div class="page">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:8px;">
+    <div>
+      <div style="font-size:18px;font-weight:500;">Personas</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:2px;">Επίλεξε μια Persona για να δεις τα sessions και να αξιολογήσεις.</div>
+    </div>
+    <button class="btn sm" id="btn-refresh">↻ Ανανέωση</button>
+  </div>
+
+  <div id="main-body">
+    <div style="text-align:center;padding:3rem;color:var(--muted);">
+      <span class="spin"></span><br><br>Φόρτωση Personas...
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+firebase.initializeApp(FIREBASE_CONFIG);
+const auth = firebase.auth();
+const db   = firebase.database();
+const $    = id => document.getElementById(id);
+const esc  = s => { const d=document.createElement('div'); d.textContent=String(s||''); return d.innerHTML; };
+
+let ME = null;
+
+auth.onAuthStateChanged(u => {
+  if(!u){ location.href='index.html'; return; }
+  ME = u;
+  const name = u.displayName || u.email;
+  $('umail').textContent = u.email;
+  $('av').textContent    = name.trim().split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+  load();
+});
+
+$('btn-out').addEventListener('click', async()=>{ await auth.signOut(); location.href='index.html'; });
+$('btn-refresh').addEventListener('click', load);
+
+async function load(){
+  $('main-body').innerHTML=`<div style="text-align:center;padding:3rem;color:var(--muted);"><span class="spin"></span><br><br>Φόρτωση...</div>`;
+  try{
+    const snap = await db.ref('sessions').get();
+    if(!snap.exists()){
+      $('main-body').innerHTML=`<div style="text-align:center;padding:3rem;color:var(--muted);">Δεν υπάρχουν sessions ακόμη.</div>`;
+      return;
+    }
+
+    const sessions = snap.val();
+
+    // Group sessions by personaTitle
+    const grouped = {};
+    Object.entries(sessions).forEach(([code, s]) => {
+      const key = (s.personaTitle || '—').trim();
+      if(!grouped[key]) grouped[key] = { personaTitle: key, personaRole: s.personaRole||'', sessions: [] };
+      grouped[key].sessions.push({ code, ...s });
+    });
+
+    // Sort groups by personaRole
+    const sortedGroups = Object.values(grouped)
+      .sort((a,b) => a.personaRole.localeCompare(b.personaRole, 'el'));
+
+    const html = sortedGroups.map((g, idx) => {
+      // Count total evals and my evals across all sessions of this persona
+      let totalEvals = 0, myEvals = 0;
+      g.sessions.forEach(s => {
+        const evs = s.evaluations ? Object.values(s.evaluations) : [];
+        totalEvals += evs.length;
+        myEvals    += evs.filter(ev => ev.evaluatorUid===ME.uid || ev.evaluatorEmail===ME.email).length;
+      });
+
+      const roleShort = g.personaRole.length>140 ? g.personaRole.substring(0,140)+'…' : g.personaRole;
+
+      const myBadge = myEvals > 0
+        ? `<span class="my-eval-badge">✓ ${myEvals} αξιολ${myEvals!==1?'ογήσεις':'όγησή'} μου</span>`
+        : `<span style="font-size:11px;color:var(--muted);">Δεν έχεις αξιολογήσει ακόμη</span>`;
+
+      // Pass personaTitle as URL param
+      const encTitle = encodeURIComponent(g.personaTitle);
+
+      return `
+        <div class="persona-card">
+          <div class="pc-head">
+            <div class="pc-num">${idx+1}</div>
+            <div class="pc-info">
+              <div class="pc-title">${esc(g.personaTitle)}</div>
+              <div class="pc-role">${esc(roleShort)}</div>
+              <div class="pc-meta">
+                ${g.sessions.length} session${g.sessions.length!==1?'s':''} &nbsp;·&nbsp;
+                ${totalEvals} αξιολ${totalEvals!==1?'ογήσεις':'όγηση'} συνολικά
+              </div>
+            </div>
+            <div style="flex-shrink:0;">
+              <a href="evaluationlist4persona.html?persona=${encTitle}" class="btn sm pri">Επεξεργασία →</a>
+            </div>
+          </div>
+          <div class="pc-footer">
+            ${myBadge}
+          </div>
+        </div>`;
+    }).join('');
+
+    $('main-body').innerHTML = `<div class="persona-grid">${html}</div>`;
+  }catch(e){
+    $('main-body').innerHTML=`<div class="notice n-err">Σφάλμα φόρτωσης: ${esc(e.message)}</div>`;
+  }
+}
+</script>
+</body>
+</html>

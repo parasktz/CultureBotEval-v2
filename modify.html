@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Persona Evaluation — Modify</title>
+<link rel="stylesheet" href="styles.css"/>
+<style>
+.ms-card{
+  background:var(--card);border:.5px solid var(--border);border-radius:var(--r);
+  margin-bottom:1rem;overflow:hidden;
+}
+.ms-head{
+  padding:1rem 1.25rem;display:flex;align-items:flex-start;justify-content:space-between;
+  gap:12px;flex-wrap:wrap;cursor:pointer;transition:background .12s;
+}
+.ms-head:hover{background:var(--bg);}
+.ms-title{font-size:15px;font-weight:500;color:var(--text);margin-bottom:4px;}
+.ms-meta{font-size:12px;color:var(--muted);line-height:1.6;}
+.ms-code{font-family:monospace;font-weight:600;color:var(--blue-t);background:var(--blue-bg);border-radius:4px;padding:1px 7px;font-size:12px;}
+.ms-llm-chip{display:inline-block;font-size:11px;background:var(--bg);border:.5px solid var(--border2);border-radius:999px;padding:1px 9px;margin:2px 2px 0 0;color:var(--text);}
+.ms-edit{display:none;border-top:.5px solid var(--border);padding:1.25rem;background:var(--bg);}
+.ms-edit.open{display:block;}
+.llm-block{background:var(--card);border:.5px solid var(--border);border-radius:var(--rsm);padding:1rem 1.15rem;margin-bottom:.75rem;}
+.llm-block-head{display:flex;align-items:center;gap:8px;margin-bottom:.75rem;}
+.llm-num{width:22px;height:22px;border-radius:50%;background:var(--blue-bg);color:var(--blue-t);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.count-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.count-row input{max-width:120px;}
+.warn-evals{font-size:11px;color:var(--amber-t);background:var(--amber-bg);border-radius:4px;padding:3px 9px;display:inline-block;}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <a href="role.html" style="font-size:13px;color:var(--muted);">← Πίσω</a>
+    <div>
+      <div class="hdr-title">Modify</div>
+      <div class="hdr-sub">Επεξεργασία των sessions σου</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <div class="avatar" id="av"></div>
+    <span class="hdr-email" id="umail"></span>
+    <button class="btn sm" id="btn-out">Έξοδος</button>
+  </div>
+</div>
+
+<div class="page">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:8px;">
+    <div>
+      <div style="font-size:18px;font-weight:500;">Τα Sessions μου</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:2px;">Επεξεργάσου ή διέγραψε ό,τι δημιούργησες στο Create.</div>
+    </div>
+    <button class="btn sm" id="btn-refresh">↻ Ανανέωση</button>
+  </div>
+
+  <div id="main-body">
+    <div style="text-align:center;padding:3rem;color:var(--muted);">
+      <span class="spin"></span><br><br>Φόρτωση...
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+firebase.initializeApp(FIREBASE_CONFIG);
+const auth = firebase.auth();
+const db   = firebase.database();
+const $    = id => document.getElementById(id);
+const esc  = s => { const d=document.createElement('div'); d.textContent=String(s||''); return d.innerHTML; };
+const now  = () => new Date().toLocaleString('el-GR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+
+let ME = null;
+let editLlm = {};   /* code -> array of {title,description} (working copy) */
+
+/* Normalize any session to an LLM array (handles old single-LLM format) */
+function normalizeLlms(s){
+  if(Array.isArray(s.llms)) return s.llms.filter(Boolean).map(x=>({title:x.title||'',description:x.description||''}));
+  if(s.llms && typeof s.llms==='object') return Object.values(s.llms).filter(Boolean).map(x=>({title:x.title||'',description:x.description||''}));
+  if(s.llmTitle) return [{title:s.llmTitle, description:s.llmDescription||''}];
+  return [];
+}
+function evalCount(s){ return s.evaluations ? Object.keys(s.evaluations).length : 0; }
+
+auth.onAuthStateChanged(u => {
+  if(!u){ location.href='index.html'; return; }
+  ME = u;
+  const name = u.displayName || u.email;
+  $('umail').textContent = u.email;
+  $('av').textContent    = name.trim().split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+  load();
+});
+
+$('btn-out').addEventListener('click', async()=>{ await auth.signOut(); location.href='index.html'; });
+$('btn-refresh').addEventListener('click', load);
+
+async function load(){
+  $('main-body').innerHTML=`<div style="text-align:center;padding:3rem;color:var(--muted);"><span class="spin"></span><br><br>Φόρτωση...</div>`;
+  try{
+    const snap = await db.ref('sessions').get();
+    if(!snap.exists()){
+      $('main-body').innerHTML=`<div class="notice n-warn">Δεν υπάρχουν sessions ακόμη.</div>`;
+      return;
+    }
+    const all = snap.val();
+    editLlm = {};
+
+    // Only sessions created by me
+    const mine = Object.entries(all)
+      .filter(([,s]) => s.creatorUid === ME.uid || s.creatorEmail === ME.email)
+      .sort(([,a],[,b]) => (b.createdAt||'').localeCompare(a.createdAt||''));
+
+    if(mine.length === 0){
+      $('main-body').innerHTML=`<div class="notice n-info">Δεν έχεις δημιουργήσει sessions ακόμη. Πήγαινε στο <a href="creator.html">Create</a>.</div>`;
+      return;
+    }
+
+    $('main-body').innerHTML = mine.map(([code, s]) => buildCard(code, s)).join('');
+  }catch(e){
+    $('main-body').innerHTML=`<div class="notice n-err">Σφάλμα φόρτωσης: ${esc(e.message)}</div>`;
+  }
+}
+
+function buildCard(code, s){
+  const llms = normalizeLlms(s);
+  editLlm[code] = llms.map(x=>({title:x.title, description:x.description}));
+  const ec = evalCount(s);
+  const chips = llms.map(l => `<span class="ms-llm-chip">${esc(l.title||'—')}</span>`).join('');
+
+  return `
+    <div class="ms-card" id="card-${esc(code)}">
+      <div class="ms-head" onclick="toggleEdit('${esc(code)}')">
+        <div style="flex:1;min-width:0;">
+          <div class="ms-title">${esc(s.personaTitle||'—')}</div>
+          <div class="ms-meta">
+            <span class="ms-code">${esc(code)}</span>
+            &nbsp;·&nbsp; ${esc((s.query||'').substring(0,80))}${(s.query||'').length>80?'…':''}
+          </div>
+          <div style="margin-top:5px;">${chips}</div>
+          <div class="ms-meta" style="margin-top:5px;">
+            ${llms.length} LLM${llms.length!==1?'s':''} &nbsp;·&nbsp; ${esc(s.createdAt||'')}
+            ${ec>0 ? `&nbsp;·&nbsp; <span class="warn-evals">${ec} αξιολόγηση${ec!==1?'εις':''}</span>` : ''}
+          </div>
+        </div>
+        <div style="flex-shrink:0;font-size:12px;color:var(--blue-t);">✏ Επεξεργασία</div>
+      </div>
+
+      <div class="ms-edit" id="edit-${esc(code)}">
+        <div class="card" style="margin:0 0 1rem;">
+          <div class="sec-title">Στοιχεία Persona</div>
+          <div class="two">
+            <div class="field">
+              <div class="fl">Title of the Persona <span class="badge b-req">υποχρεωτικό</span></div>
+              <input class="fi" id="ed-title-${esc(code)}" value="${esc(s.personaTitle||'')}"/>
+            </div>
+            <div class="field">
+              <div class="fl">Creator</div>
+              <input class="fi" value="${esc(s.creator||'')}" disabled/>
+            </div>
+          </div>
+          <div class="field">
+            <div class="fl">Role of the Persona (system prompt) <span class="badge b-req">υποχρεωτικό</span></div>
+            <textarea class="fi" id="ed-role-${esc(code)}" rows="3">${esc(s.personaRole||'')}</textarea>
+          </div>
+          <div class="field">
+            <div class="fl">Instructional Guidelines <span class="badge b-opt">προαιρετικό</span></div>
+            <textarea class="fi" id="ed-guide-${esc(code)}" rows="2">${esc(s.guidelines||'')}</textarea>
+          </div>
+        </div>
+
+        <div class="card" style="margin:0 0 1rem;">
+          <div class="sec-title">Query</div>
+          <div class="field">
+            <div class="fl">Query <span class="badge b-req">υποχρεωτικό</span></div>
+            <textarea class="fi" id="ed-query-${esc(code)}" rows="3">${esc(s.query||'')}</textarea>
+          </div>
+        </div>
+
+        <div class="card" style="margin:0 0 1rem;">
+          <div class="sec-title">Στοιχεία LLM</div>
+          <div class="field">
+            <div class="fl">Πλήθος LLMs <span class="badge b-req">υποχρεωτικό</span></div>
+            <div class="count-row">
+              <input class="fi" type="number" min="1" max="10" id="ed-count-${esc(code)}" value="${llms.length}"
+                oninput="syncCount('${esc(code)}')" onchange="syncCount('${esc(code)}')"/>
+            </div>
+          </div>
+          <div id="ed-llms-${esc(code)}" style="margin-top:.85rem;"></div>
+        </div>
+
+        ${ec>0 ? `<div class="notice n-warn">⚠ Αυτό το session έχει ήδη ${ec} αξιολόγηση${ec!==1?'εις':''}. Αν αλλάξεις το πλήθος ή τη σειρά των LLMs, οι υπάρχουσες αξιολογήσεις μπορεί να μην αντιστοιχούν σωστά.</div>` : ''}
+
+        <div id="ed-msg-${esc(code)}"></div>
+        <div class="btn-row">
+          <button class="btn pri" style="background:var(--green);border-color:var(--green);" onclick="saveCard('${esc(code)}')">Αποθήκευση ✓</button>
+          <button class="btn" onclick="toggleEdit('${esc(code)}')">Ακύρωση</button>
+          <button class="btn" style="color:var(--red-t);border-color:var(--red);margin-left:auto;" onclick="delCard('${esc(code)}')">🗑 Διαγραφή</button>
+          <span id="ed-load-${esc(code)}" style="display:none;font-size:13px;color:var(--muted);"><span class="spin"></span> Αποθήκευση...</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+window.toggleEdit = function(code){
+  const el = $('edit-'+code);
+  const opening = !el.classList.contains('open');
+  el.classList.toggle('open');
+  if(opening){ renderLlms(code); el.scrollIntoView({behavior:'smooth',block:'nearest'}); }
+};
+
+function readLlmInputs(code){
+  (editLlm[code]||[]).forEach((d,i) => {
+    const t=$(`ed-llm-title-${code}-${i}`), de=$(`ed-llm-desc-${code}-${i}`);
+    if(t)  d.title=t.value;
+    if(de) d.description=de.value;
+  });
+}
+
+function renderLlms(code){
+  const wrap = $('ed-llms-'+code);
+  wrap.innerHTML = (editLlm[code]||[]).map((d,i) => `
+    <div class="llm-block">
+      <div class="llm-block-head"><div class="llm-num">${i+1}</div>
+        <div style="font-size:12px;font-weight:500;">LLM #${i+1}</div></div>
+      <div class="field">
+        <div class="fl">LLM Title <span class="badge b-req">υποχρεωτικό</span></div>
+        <input class="fi" id="ed-llm-title-${esc(code)}-${i}" value="${esc(d.title)}"/>
+      </div>
+      <div class="field">
+        <div class="fl">LLM Description <span class="badge b-req">υποχρεωτικό</span></div>
+        <textarea class="fi" id="ed-llm-desc-${esc(code)}-${i}" rows="4">${esc(d.description)}</textarea>
+      </div>
+    </div>`).join('');
+}
+
+window.syncCount = function(code){
+  const n = Math.max(1, Math.min(10, parseInt($('ed-count-'+code).value) || 1));
+  readLlmInputs(code);
+  const arr = editLlm[code] || [];
+  if(n > arr.length){ while(arr.length<n) arr.push({title:'',description:''}); }
+  else if(n < arr.length){ editLlm[code] = arr.slice(0,n); }
+  renderLlms(code);
+};
+
+window.saveCard = async function(code){
+  readLlmInputs(code);
+  const title = $('ed-title-'+code).value.trim();
+  const role  = $('ed-role-'+code).value.trim();
+  const guide = $('ed-guide-'+code).value.trim();
+  const query = $('ed-query-'+code).value.trim();
+  const msg   = $('ed-msg-'+code);
+  msg.innerHTML = '';
+
+  if(!title || !role || !query){
+    msg.innerHTML = `<div class="notice n-err">Συμπλήρωσε Persona Title, Role και Query.</div>`; return;
+  }
+  const llms = (editLlm[code]||[]).map(d=>({title:(d.title||'').trim(),description:(d.description||'').trim()}));
+  for(let i=0;i<llms.length;i++){
+    if(!llms[i].title || !llms[i].description){
+      msg.innerHTML = `<div class="notice n-err">Συμπλήρωσε Title και Description για το LLM #${i+1}.</div>`; return;
+    }
+  }
+
+  $('ed-load-'+code).style.display = '';
+  try{
+    await db.ref('sessions/'+code).update({
+      personaTitle: title,
+      personaRole:  role,
+      guidelines:   guide,
+      query:        query,
+      llmCount:     llms.length,
+      llms:         llms,
+      updatedAt:    now()
+    });
+    // Remove any stale single-LLM fields from old format
+    await db.ref('sessions/'+code+'/llmTitle').remove();
+    await db.ref('sessions/'+code+'/llmDescription').remove();
+    load();
+  }catch(e){
+    $('ed-load-'+code).style.display = 'none';
+    msg.innerHTML = `<div class="notice n-err">Σφάλμα: ${esc(e.message)}</div>`;
+  }
+};
+
+window.delCard = async function(code){
+  if(!confirm('Σίγουρα θέλεις να διαγράψεις αυτό το session; Η ενέργεια είναι μη αναστρέψιμη.')) return;
+  try{
+    await db.ref('sessions/'+code).remove();
+    load();
+  }catch(e){ alert('Σφάλμα διαγραφής: '+e.message); }
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Persona Evaluation — Ρόλος</title>
+<link rel="stylesheet" href="styles.css"/>
+<style>
+.role-page{min-height:100vh;display:flex;flex-direction:column;}
+.role-body{flex:1;display:flex;align-items:center;justify-content:center;padding:2rem 1.25rem;}
+.role-inner{width:100%;max-width:560px;}
+.role-welcome{text-align:center;margin-bottom:2rem;}
+.role-welcome h1{font-size:22px;font-weight:500;margin-bottom:.4rem;}
+.role-welcome p{font-size:14px;color:var(--muted);}
+.role-cards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+@media(max-width:560px){.role-cards{grid-template-columns:1fr 1fr;}}
+@media(max-width:400px){.role-cards{grid-template-columns:1fr;}}
+.role-card{
+  background:var(--card);
+  border:.5px solid var(--border2);
+  border-radius:var(--r);
+  padding:1.5rem 1rem;
+  cursor:pointer;
+  transition:border-color .2s, transform .15s, box-shadow .15s;
+  text-align:center;
+}
+.role-card:hover{
+  border-color:var(--blue);
+  transform:translateY(-3px);
+}
+.role-card-icon{font-size:32px;margin-bottom:.6rem;line-height:1;}
+.role-card-title{font-size:16px;font-weight:500;margin-bottom:.35rem;color:var(--text);}
+.role-card-desc{font-size:12px;color:var(--muted);line-height:1.45;}
+</style>
+</head>
+<body class="role-page">
+
+<div class="hdr">
+  <div>
+    <div class="hdr-title">Persona Evaluation System</div>
+    <div class="hdr-sub">Επιλογή ρόλου</div>
+  </div>
+  <div class="hdr-right">
+    <div class="avatar" id="av"></div>
+    <span class="hdr-email" id="umail"></span>
+    <button class="btn sm" id="btn-out">Έξοδος</button>
+  </div>
+</div>
+
+<div class="role-body">
+  <div class="role-inner">
+    <div class="role-welcome">
+      <h1>Καλώς ήρθες!</h1>
+      <p>Επίλεξε πώς θέλεις να συμμετέχεις σήμερα.</p>
+    </div>
+    <div class="role-cards">
+      <div class="role-card" onclick="location.href='creator.html'">
+        <div class="role-card-icon">🟦</div>
+        <div class="role-card-title">Create</div>
+        <div class="role-card-desc">Δημιούργησε νέο session με persona, query και ένα ή περισσότερα LLMs.</div>
+      </div>
+      <div class="role-card" onclick="location.href='modify.html'">
+        <div class="role-card-icon">✏️</div>
+        <div class="role-card-title">Modify</div>
+        <div class="role-card-desc">Επεξεργάσου ή διέγραψε sessions που δημιούργησες.</div>
+      </div>
+      <div class="role-card" onclick="location.href='evaluator.html'">
+        <div class="role-card-icon">🟩</div>
+        <div class="role-card-title">Evaluation</div>
+        <div class="role-card-desc">Αξιολόγησε υπάρχοντα sessions ανά Persona.</div>
+      </div>
+      <div class="role-card" onclick="location.href='statistics.html'">
+        <div class="role-card-icon">📊</div>
+        <div class="role-card-title">Statistics</div>
+        <div class="role-card-desc">Δες τα αναλυτικά διαγράμματα.</div>
+      </div>
+      <div class="role-card" onclick="location.href='admin.html'">
+        <div class="role-card-icon">⚙️</div>
+        <div class="role-card-title">Admin pages</div>
+        <div class="role-card-desc">Μόνο για διαχειριστές.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script>
+firebase.initializeApp(FIREBASE_CONFIG);
+const auth = firebase.auth();
+const $ = id => document.getElementById(id);
+
+auth.onAuthStateChanged(u => {
+  if(!u){ location.href='index.html'; return; }
+  const name = u.displayName || u.email;
+  $('umail').textContent = u.email;
+  $('av').textContent    = name.trim().split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+});
+
+$('btn-out').addEventListener('click', async () => {
+  await auth.signOut();
+  location.href = 'index.html';
+});
+</script>
+</body>
+</html>
