@@ -421,7 +421,25 @@ async function loadDashboard(){
   const keys     = Object.keys(sessions);
   const personas = [...new Set(keys.map(k=>sessions[k].personaTitle||''))].filter(Boolean);
   const queries  = [...new Set(keys.map(k=>sessions[k].query||''))].filter(Boolean);
-  const llms     = [...new Set(keys.map(k=>detectLLM(sessions[k])))].filter(Boolean);
+  // Collect LLM labels from evaluation records (v2 nests them under llms.<k>.llmTitle).
+  const llmSet = new Set();
+  keys.forEach(k=>{
+    const ev = sessions[k].evaluations;
+    if(ev && typeof ev === 'object'){
+      const children = ev.ratings ? [ev] : Object.values(ev);
+      children.forEach(c=>{
+        if(!c || typeof c !== 'object') return;
+        if(c.ratings){ llmSet.add(detectLLM(sessions[k])); }
+        else if(c.llms && typeof c.llms === 'object'){
+          Object.values(c.llms).forEach(l=>{
+            if(l && typeof l === 'object' && l.ratings)
+              llmSet.add(detectLLM({llmTitle:l.llmTitle, llmSource:l.llmSource}));
+          });
+        }
+      });
+    }
+  });
+  const llms     = [...llmSet].filter(l=>l&&l!=='Unknown');
   const scored   = keys.filter(k=>getLatestRatings(sessions[k])!==null).length;
 
   document.getElementById('s-sessions').textContent = keys.length;
@@ -806,6 +824,18 @@ async function updateLatestPointerSingle(filename, type){
 // Handles all possible Firebase structures for evaluations:
 // Structure A: session.evaluations.ratings (single evaluation)
 // Structure B: session.evaluations.<pushKey>.ratings (multiple evaluations)
+// Structure C: session.evaluations.<pushKey>.llms.<llmKey>.ratings (per-LLM ratings, v2)
+//
+// Returns true if an object (evaluation child) carries ratings in any shape.
+function hasAnyRatings(obj){
+  if(!obj || typeof obj !== 'object') return false;
+  if(obj.ratings) return true;
+  if(obj.llms && typeof obj.llms === 'object'){
+    return Object.values(obj.llms).some(l => l && typeof l === 'object' && l.ratings);
+  }
+  return false;
+}
+
 function getLatestRatings(session){
   const ev = session.evaluations;
   if(!ev || typeof ev !== 'object') return null;
@@ -815,14 +845,20 @@ function getLatestRatings(session){
     return ev.ratings;
   }
 
-  // Structure B: collection of evaluation records (push keys)
+  // Structure B/C: collection of evaluation records (push keys)
   let latest = null;
   let latestTs = '';
   Object.values(ev).forEach(child => {
-    if(child && typeof child === 'object' && child.ratings){
+    if(child && typeof child === 'object' && hasAnyRatings(child)){
       const ts = child.timestamp || '';
       if(!latest || ts > latestTs){
-        latest  = child.ratings;
+        // Prefer direct ratings; otherwise first per-LLM ratings found
+        if(child.ratings){
+          latest = child.ratings;
+        } else {
+          const firstLlm = Object.values(child.llms).find(l => l && l.ratings);
+          latest = firstLlm ? firstLlm.ratings : null;
+        }
         latestTs = ts;
       }
     }
@@ -848,13 +884,14 @@ async function debugEvaluations(){
       countA++;
       if(!sample) sample = {key:k, structure:'A (direct ratings)', ratings:ev.ratings};
     } else {
-      // Check for push key children
-      const hasChild = Object.values(ev).some(c=>c && typeof c==='object' && c.ratings);
+      // Check for push key children (Structure B/C)
+      const hasChild = Object.values(ev).some(c=>c && typeof c==='object' && hasAnyRatings(c));
       if(hasChild){
         countB++;
         if(!sample){
-          const child = Object.values(ev).find(c=>c&&c.ratings);
-          sample = {key:k, structure:'B (collection)', ratings:child.ratings};
+          const child = Object.values(ev).find(c=>c && hasAnyRatings(c));
+          const r = child.ratings || (Object.values(child.llms||{}).find(l=>l&&l.ratings)||{}).ratings;
+          sample = {key:k, structure:'B/C (collection)', ratings:r};
         }
       } else {
         countNone++;
@@ -892,7 +929,7 @@ async function debugEvaluations(){
         Object.entries(ev).forEach(([kk, child])=>{
           if(!child || typeof child !== 'object') return;
           if(kk === 'timestamp' || kk === 'metadata' || kk === 'by') return;
-          if(child.ratings) evalCount++;
+          if(hasAnyRatings(child)) evalCount++;
         });
       }
     }
@@ -930,11 +967,11 @@ function buildFile1(data){
       // Structure A: single evaluation on the session
       ids.push(extractId(ev, s.creatorUid || s.id || 'anon'));
     } else {
-      // Structure B: evaluations/<pushKey>/ratings
+      // Structure B/C: evaluations/<pushKey>/(ratings | llms.<k>.ratings)
       Object.entries(ev).forEach(([k, child])=>{
         if(!child || typeof child !== 'object') return;
         if(k === 'timestamp' || k === 'metadata' || k === 'by') return;
-        if(child.ratings) ids.push(extractId(child, k)); // fallback = push key
+        if(hasAnyRatings(child)) ids.push(extractId(child, k)); // fallback = push key
       });
     }
     return ids;
@@ -945,13 +982,39 @@ function buildFile1(data){
   const perPersonaEvaluators = {}; // Set per persona of unique evaluator IDs
   const allEvaluators = new Set();
 
+  // Derive {llmLabel: evaluatorCount} for a session from its evaluation records.
+  // v2: ratings live under evaluations.<key>.llms.<k>.ratings, with llmTitle per LLM.
+  // Falls back to session-level detectLLM for the old direct-ratings shape.
+  function getLlmEvaluatorCounts(s){
+    const ev = s.evaluations;
+    const counts = {}; // llmLabel -> number of evaluator contributions
+    if(!ev || typeof ev !== 'object') return counts;
+    const children = ev.ratings
+      ? [ev]
+      : Object.entries(ev)
+          .filter(([k,c])=> c && typeof c==='object' && k!=='timestamp' && k!=='metadata' && k!=='by')
+          .map(([,c])=>c);
+    children.forEach(child=>{
+      if(child.ratings){
+        const l = detectLLM(s);
+        counts[l] = (counts[l]||0) + 1;
+      } else if(child.llms && typeof child.llms === 'object'){
+        Object.values(child.llms).forEach(l=>{
+          if(l && typeof l === 'object' && l.ratings){
+            const label = detectLLM({llmTitle:l.llmTitle, llmSource:l.llmSource});
+            counts[label] = (counts[label]||0) + 1;
+          }
+        });
+      }
+    });
+    return counts;
+  }
+
   allKeys.forEach(k=>{
     const s   = sessions[k];
     const pt  = s.personaTitle || 'Unknown';
     const q   = s.query || '';
-    const llm = detectLLM(s);
     const evalIds = getEvaluatorIds(s);
-    const n   = evalIds.length;
 
     evalIds.forEach(id=>{
       allEvaluators.add(id);
@@ -959,17 +1022,29 @@ function buildFile1(data){
       perPersonaEvaluators[pt].add(id);
     });
 
-    if(!byPersona[pt])         byPersona[pt]         = {};
-    if(!byPersona[pt][q])      byPersona[pt][q]      = {};
-    if(!byPersona[pt][q][llm]) byPersona[pt][q][llm] = { sessions:0, evaluators:0 };
-    byPersona[pt][q][llm].sessions++;
-    byPersona[pt][q][llm].evaluators += n;
+    if(!byPersona[pt])    byPersona[pt]    = {};
+    if(!byPersona[pt][q]) byPersona[pt][q] = {};
+
+    const llmCounts = getLlmEvaluatorCounts(s);
+    const llmLabels = Object.keys(llmCounts);
+    // Ensure the session is represented even if it has no evaluations yet.
+    if(!llmLabels.length){
+      const l = detectLLM(s);
+      if(!byPersona[pt][q][l]) byPersona[pt][q][l] = { sessions:0, evaluators:0 };
+      byPersona[pt][q][l].sessions++;
+    } else {
+      llmLabels.forEach(l=>{
+        if(!byPersona[pt][q][l]) byPersona[pt][q][l] = { sessions:0, evaluators:0 };
+        byPersona[pt][q][l].sessions++;
+        byPersona[pt][q][l].evaluators += llmCounts[l];
+      });
+    }
   });
 
   const personaLabels = Object.keys(byPersona);
   const totalQueries  = personaLabels.reduce((a,p)=>a+Object.keys(byPersona[p]).length,0);
   const llmSet = new Set();
-  allKeys.forEach(k=>llmSet.add(detectLLM(sessions[k])));
+  personaLabels.forEach(p=>Object.values(byPersona[p]).forEach(qMap=>Object.keys(qMap).forEach(l=>llmSet.add(l))));
   const llmList = [...llmSet].filter(l=>l&&l!=='Unknown');
   const totalEvals = allKeys.reduce((a,k)=>a+getEvaluatorIds(sessions[k]).length,0);
 
@@ -1150,42 +1225,53 @@ function buildFile2(data){
 
     const persona = s.personaTitle || 'Unknown';
     const query   = s.query || '';
-    const llm     = detectLLM(s);
-    if(llm === 'Unknown' || !query) return;
+    if(!query) return;
 
-    // Collect ALL rating objects from this session + track evaluator IDs
-    const ratingsList = [];
-    const evIdsForThisSession = [];
-    if(ev.ratings){
-      ratingsList.push(ev.ratings);
-      evIdsForThisSession.push(extractEvalId(ev, s.creatorUid || s.id || 'anon'));
-    } else {
-      Object.entries(ev).forEach(([k, child])=>{
-        if(!child || typeof child !== 'object') return;
-        if(k === 'timestamp' || k === 'metadata' || k === 'by') return;
-        if(child.ratings){
-          ratingsList.push(child.ratings);
-          evIdsForThisSession.push(extractEvalId(child, k));
-        }
+    // Normalise evaluation records into a flat list of children to scan.
+    // Structure A: ev itself is the record. Structure B/C: ev.<pushKey>.
+    const children = ev.ratings
+      ? [ev]
+      : Object.entries(ev)
+          .filter(([k,c])=> c && typeof c==='object' && k!=='timestamp' && k!=='metadata' && k!=='by')
+          .map(([,c])=>c);
+
+    children.forEach(child=>{
+      const evId = extractEvalId(child, s.creatorUid || s.id || 'anon');
+
+      // Build {llmLabel: ratings} pairs for this evaluation.
+      const pairs = [];
+      if(child.ratings){
+        // Old shape: ratings sit directly on the record; LLM from the session.
+        pairs.push([detectLLM(s), child.ratings]);
+      } else if(child.llms && typeof child.llms === 'object'){
+        // v2 shape: per-LLM ratings nested under llms.<key>.
+        Object.values(child.llms).forEach(l=>{
+          if(l && typeof l === 'object' && l.ratings){
+            pairs.push([detectLLM({llmTitle:l.llmTitle, llmSource:l.llmSource}), l.ratings]);
+          }
+        });
+      }
+      if(!pairs.length) return;
+
+      // This evaluator contributed at least one rating to this session.
+      DATA.summary.evaluators.add(evId);
+
+      pairs.forEach(([llm, ratings])=>{
+        if(llm === 'Unknown') return;
+        if(!grouped[persona])              grouped[persona]              = {};
+        if(!grouped[persona][query])       grouped[persona][query]       = {};
+        if(!grouped[persona][query][llm])  grouped[persona][query][llm]  = [];
+        grouped[persona][query][llm].push(ratings);
       });
-    }
-    if(!ratingsList.length) return;
 
-    // Track unique evaluators globally
-    evIdsForThisSession.forEach(id => DATA.summary.evaluators.add(id));
-
-    if(!grouped[persona])           grouped[persona]           = {};
-    if(!grouped[persona][query])    grouped[persona][query]    = {};
-    if(!grouped[persona][query][llm]) grouped[persona][query][llm] = [];
-    grouped[persona][query][llm].push(...ratingsList);
-
-    // Remember role/guidelines
-    if(!persRoleById[persona]){
-      persRoleById[persona] = {
-        role: s.personaRole || '',
-        guidelines: s.personaGuidelines || ''
-      };
-    }
+      // Remember role/guidelines
+      if(!persRoleById[persona]){
+        persRoleById[persona] = {
+          role: s.personaRole || '',
+          guidelines: s.personaGuidelines || ''
+        };
+      }
+    });
   });
 
   // Second pass: compute distributions per criterion per llm
