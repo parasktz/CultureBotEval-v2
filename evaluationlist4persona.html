@@ -26,12 +26,26 @@
 .sub-guide  .sub-label{color:var(--amber-t);}
 .sub-guide  .sub-val{color:var(--text);}
 
-/* LLM list inside session */
-.llm-mini{background:var(--bg);border:.5px solid var(--border);border-radius:var(--rsm);padding:9px 13px;}
-.llm-mini-head{display:flex;align-items:center;gap:7px;margin-bottom:3px;}
-.llm-mini-num{width:18px;height:18px;border-radius:50%;background:var(--blue-bg);color:var(--blue-t);font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.llm-mini-title{font-size:13px;font-weight:600;color:var(--text);}
-.llm-mini-desc{font-size:12px;color:var(--muted);line-height:1.55;white-space:pre-wrap;margin-top:2px;}
+/* LLM columns table inside session */
+.llm-table-wrap{margin-top:8px;overflow-x:auto;border:.5px solid var(--border);border-radius:var(--rsm);}
+.llm-table{border-collapse:collapse;width:100%;min-width:100%;table-layout:fixed;}
+.llm-table th,.llm-table td{border:.5px solid var(--border);vertical-align:top;padding:8px 10px;text-align:left;}
+.llm-th{background:var(--blue-bg);}
+.llm-th-num{display:inline-flex;width:18px;height:18px;border-radius:50%;background:var(--blue);color:#fff;font-size:10px;font-weight:600;align-items:center;justify-content:center;margin-bottom:4px;}
+.llm-th-title{font-size:13px;font-weight:600;color:var(--blue-t);line-height:1.4;word-break:break-word;}
+.llm-td{font-size:12px;color:var(--text);}
+.llm-td-desc{color:var(--muted);line-height:1.55;}
+.llm-desc-short,.llm-desc-full{white-space:pre-wrap;word-break:break-word;}
+.desc-more{border:none;background:none;color:var(--blue-t);font-size:11px;font-weight:600;cursor:pointer;padding:0 2px;font-family:inherit;}
+.desc-more:hover{text-decoration:underline;}
+.llm-row-count td{background:var(--bg);}
+.llm-count-badge{display:inline-block;min-width:20px;text-align:center;background:var(--green-bg);color:var(--green-t);border-radius:999px;padding:1px 8px;font-size:12px;font-weight:700;}
+.llm-count-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-left:5px;}
+.llm-td-evs{}
+.llm-ev-wrap{display:flex;flex-wrap:wrap;gap:4px;}
+.llm-ev-chip{font-size:11px;background:var(--green-bg);color:var(--green-t);border-radius:4px;padding:2px 8px;border:.5px solid rgba(0,0,0,.05);word-break:break-word;}
+.llm-ev-none{font-size:11px;color:var(--muted);}
+.llm-mini-num{display:inline-flex;width:18px;height:18px;border-radius:50%;background:var(--blue-bg);color:var(--blue-t);font-size:10px;font-weight:600;align-items:center;justify-content:center;flex-shrink:0;}
 
 .evals-bar{background:var(--bg);border-top:.5px solid var(--border);padding:.55rem 1.25rem;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;}
 .eval-row-item{border-top:.5px solid var(--border);padding:.75rem 1.25rem;display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;}
@@ -179,12 +193,74 @@ async function load(){
         ? `<div class="evals-bar">Αξιολογήσεις (${allEvals.length})</div>${evalRows}`
         : `<div class="evals-bar">Καμία αξιολόγηση ακόμη</div>`;
 
-      const llmCards = llms.map((l, li) => `
-        <div class="llm-mini">
-          <div class="llm-mini-head"><div class="llm-mini-num">${li+1}</div>
-            <div class="llm-mini-title">${esc(l.title||'—')}</div></div>
-          <div class="llm-mini-desc">${esc(l.description||'—')}</div>
-        </div>`).join('');
+      // Per-LLM evaluation stats: count of evaluations that rated each LLM + evaluator names
+      const llmStats = llms.map(()=>({count:0, evaluators:[]}));
+      const seenPerLlm = llms.map(()=>new Set());
+      allEvals.forEach(([key, ev])=>{
+        const perLlm = evalLlmData(ev, llms);
+        const who = ev.evaluator || ev.evaluatorEmail || '—';
+        const whoId = ev.evaluatorUid || ev.evaluatorEmail || who;
+        perLlm.forEach((d, li)=>{
+          const hasRating = d.ratings && Object.values(d.ratings).some(v=>v && v!=='' );
+          if(hasRating){
+            llmStats[li].count++;
+            if(!seenPerLlm[li].has(whoId)){
+              seenPerLlm[li].add(whoId);
+              llmStats[li].evaluators.push(who);
+            }
+          }
+        });
+      });
+
+      // LLM columns table: row1 = Title, row2 = Description (+more), row3 = eval count, row4 = evaluators
+      const colWidth = `${(100/Math.max(llms.length,1)).toFixed(4)}%`;
+      const titleCells = llms.map((l, li)=>`
+        <th class="llm-th" style="width:${colWidth}">
+          <div class="llm-th-num">${li+1}</div>
+          <div class="llm-th-title">${esc(l.title||'—')}</div>
+        </th>`).join('');
+
+      const descCells = llms.map((l, li)=>{
+        const desc = l.description || '';
+        const full = esc(desc) || '—';
+        const isLong = desc.length > 120;
+        const short = isLong ? esc(desc.slice(0,120))+'…' : full;
+        const cid = `desc-${code}-${li}`;
+        const moreBtn = isLong
+          ? `<button type="button" class="desc-more" onclick="toggleDesc('${cid}')" id="${cid}-btn">more ▾</button>`
+          : '';
+        return `
+        <td class="llm-td llm-td-desc">
+          <div class="llm-desc-short" id="${cid}-short">${short} ${moreBtn}</div>
+          <div class="llm-desc-full" id="${cid}-full" style="display:none;">${full} <button type="button" class="desc-more" onclick="toggleDesc('${cid}')">less ▴</button></div>
+        </td>`;
+      }).join('');
+
+      const countCells = llms.map((l, li)=>`
+        <td class="llm-td llm-td-count">
+          <span class="llm-count-badge">${llmStats[li].count}</span>
+          <span class="llm-count-lbl">αξιολογήσε${llmStats[li].count===1?'ις':'ις'}</span>
+        </td>`).join('');
+
+      const evalCells = llms.map((l, li)=>{
+        const names = llmStats[li].evaluators;
+        const chips = names.length
+          ? names.map(n=>`<span class="llm-ev-chip">${esc(n)}</span>`).join('')
+          : '<span class="llm-ev-none">—</span>';
+        return `<td class="llm-td llm-td-evs"><div class="llm-ev-wrap">${chips}</div></td>`;
+      }).join('');
+
+      const llmTable = `
+        <div class="llm-table-wrap">
+          <table class="llm-table">
+            <thead><tr>${titleCells}</tr></thead>
+            <tbody>
+              <tr class="llm-row-desc">${descCells}</tr>
+              <tr class="llm-row-count">${countCells}</tr>
+              <tr class="llm-row-evs">${evalCells}</tr>
+            </tbody>
+          </table>
+        </div>`;
 
       return `
         <div class="sess-card">
@@ -220,7 +296,7 @@ async function load(){
             </div>
             <div class="sub-card" style="background:var(--bg);border:.5px solid var(--border);">
               <div class="sub-label" style="color:var(--muted);">Πλήθος LLMs: ${llms.length}</div>
-              <div style="display:flex;flex-direction:column;gap:.5rem;margin-top:6px;">${llmCards}</div>
+              ${llmTable}
             </div>
           </div>
 
@@ -324,6 +400,14 @@ function buildEvalRow(sessionCode, evalKey, ev, llms){
     </div>
     ${editFormHtml}`;
 }
+
+window.toggleDesc = function(cid){
+  const short=$(cid+'-short'), full=$(cid+'-full');
+  if(!short||!full) return;
+  const showFull = full.style.display==='none';
+  full.style.display  = showFull ? 'block' : 'none';
+  short.style.display = showFull ? 'none'  : 'block';
+};
 
 window.toggleEdit = function(sk){
   const el=$('ef-'+sk); if(!el) return;
