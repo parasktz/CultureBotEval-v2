@@ -1,0 +1,1726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>CultureBotEval — Admin</title>
+<script src="config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<style>
+:root{
+  --bg:#0f0f0f;--surface:#1a1a1a;--surface2:#242424;--border:rgba(255,255,255,.08);
+  --text:#e8e6e0;--muted:#888;--accent:#c8a96e;--accent2:#6ea8c8;
+  --red:#e05555;--green:#55c47a;--r:8px;
+  --font:'Georgia',serif;--mono:'Courier New',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;}
+
+/* ── LOGIN ── */
+#login-screen{
+  display:flex;align-items:center;justify-content:center;min-height:100vh;
+  background:radial-gradient(ellipse at 60% 40%,rgba(200,169,110,.07),transparent 60%);
+}
+.login-box{
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:2.5rem 2rem;width:100%;max-width:360px;text-align:center;
+}
+.login-box h1{font-size:20px;font-weight:400;letter-spacing:.08em;color:var(--accent);margin-bottom:4px;}
+.login-box p{font-size:12px;color:var(--muted);margin-bottom:1.8rem;font-family:var(--mono);}
+.field{margin-bottom:1rem;text-align:left;}
+.field label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em;}
+.field input{
+  width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;
+  padding:.55rem .75rem;color:var(--text);font-size:14px;font-family:var(--font);
+  outline:none;transition:border .2s;
+}
+.field input:focus{border-color:var(--accent);}
+.btn{
+  display:inline-flex;align-items:center;gap:6px;
+  background:var(--accent);color:#0f0f0f;border:none;border-radius:6px;
+  padding:.6rem 1.2rem;font-size:13px;font-weight:600;cursor:pointer;
+  transition:opacity .2s;width:100%;justify-content:center;
+}
+.btn:hover{opacity:.88;}
+.btn.secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+.btn.danger{background:var(--red);color:#fff;}
+.btn.sm{font-size:12px;padding:.4rem .9rem;width:auto;}
+.err-msg{font-size:12px;color:var(--red);margin-top:.7rem;}
+
+/* ── LAYOUT ── */
+#app{display:none;min-height:100vh;}
+.sidebar{
+  position:fixed;left:0;top:0;bottom:0;width:220px;
+  background:var(--surface);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;padding:1.5rem 1rem;
+}
+.sidebar-logo{font-size:13px;color:var(--accent);letter-spacing:.1em;margin-bottom:.3rem;}
+.sidebar-sub{font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:1.5rem;}
+.nav-item{
+  display:block;padding:.55rem .75rem;border-radius:6px;font-size:13px;
+  color:var(--muted);cursor:pointer;text-decoration:none;margin-bottom:2px;
+  transition:all .15s;
+}
+.nav-item:hover,.nav-item.active{background:var(--surface2);color:var(--text);}
+.nav-item.active{color:var(--accent);}
+.sidebar-bottom{margin-top:auto;}
+.user-tag{font-size:11px;color:var(--muted);font-family:var(--mono);word-break:break-all;margin-bottom:.6rem;}
+
+.main{margin-left:220px;padding:2rem 2.5rem;min-height:100vh;}
+.page{display:none;}
+.page.active{display:block;}
+
+h2{font-size:18px;font-weight:400;color:var(--accent);margin-bottom:.3rem;letter-spacing:.04em;}
+.page-sub{font-size:12px;color:var(--muted);margin-bottom:1.8rem;font-family:var(--mono);}
+
+/* ── CARDS ── */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:2rem;}
+.card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  padding:1rem 1.1rem;
+}
+.card-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;}
+.card-val{font-size:28px;font-weight:300;color:var(--text);}
+
+/* ── GENERATE SECTION ── */
+.gen-box{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  padding:1.5rem;margin-bottom:1.5rem;
+}
+.gen-box h3{font-size:14px;color:var(--text);margin-bottom:.4rem;}
+.gen-box p{font-size:12px;color:var(--muted);margin-bottom:1rem;line-height:1.6;}
+.token-row{display:flex;gap:8px;margin-bottom:1rem;}
+.token-row input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;
+  padding:.5rem .75rem;color:var(--text);font-size:12px;font-family:var(--mono);outline:none;}
+.token-row input:focus{border-color:var(--accent);}
+.gen-actions{display:flex;gap:8px;flex-wrap:wrap;}
+
+/* ── LOG ── */
+.log-box{
+  background:var(--surface2);border:1px solid var(--border);border-radius:6px;
+  padding:.75rem 1rem;font-family:var(--mono);font-size:11px;line-height:1.7;
+  max-height:220px;overflow-y:auto;margin-top:1rem;
+}
+.log-ok{color:var(--green);}
+.log-err{color:var(--red);}
+.log-info{color:var(--accent2);}
+
+/* ── TABLE ── */
+.tbl-wrap{overflow-x:auto;margin-top:1rem;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{text-align:left;padding:.6rem .8rem;color:var(--muted);font-weight:400;
+   border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px;}
+td{padding:.55rem .8rem;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:top;}
+tr:hover td{background:rgba(255,255,255,.02);}
+.chip{
+  display:inline-block;font-size:10px;padding:1px 7px;border-radius:4px;
+  font-family:var(--mono);background:var(--surface2);border:1px solid var(--border);
+}
+.chip.v1{color:var(--accent);}
+.chip.v2{color:var(--accent2);}
+a.link{color:var(--accent2);text-decoration:none;font-family:var(--mono);}
+a.link:hover{text-decoration:underline;}
+
+/* ── CONFIG ── */
+.cfg-grid{display:grid;gap:1rem;}
+.cfg-row{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  padding:1rem 1.25rem;display:flex;align-items:center;gap:12px;
+}
+.cfg-row input{
+  flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;
+  padding:.45rem .75rem;color:var(--text);font-size:12px;font-family:var(--mono);outline:none;
+}
+.cfg-row label{font-size:12px;color:var(--muted);min-width:160px;}
+
+/* ── USERS ── */
+.user-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  padding:.9rem 1.25rem;display:flex;align-items:center;gap:14px;margin-bottom:8px;
+}
+.user-avatar{
+  width:36px;height:36px;border-radius:50%;background:var(--surface2);
+  border:1px solid var(--border);display:flex;align-items:center;justify-content:center;
+  font-size:15px;flex-shrink:0;
+}
+.user-info{flex:1;min-width:0;}
+.user-email{font-size:13px;color:var(--text);word-break:break-all;}
+.user-meta{font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:2px;}
+.user-actions{display:flex;gap:6px;flex-shrink:0;}
+.toggle-admin{
+  font-size:11px;padding:4px 12px;border-radius:5px;cursor:pointer;
+  border:1px solid var(--border);background:var(--surface2);color:var(--text);
+  transition:all .15s;
+}
+.toggle-admin.is-admin{background:var(--accent);color:#0f0f0f;border-color:var(--accent);}
+.toggle-admin:hover{opacity:.8;}
+.search-bar{
+  width:100%;background:var(--surface);border:1px solid var(--border);border-radius:6px;
+  padding:.55rem .9rem;color:var(--text);font-size:13px;font-family:var(--font);
+  outline:none;margin-bottom:1rem;
+}
+.search-bar:focus{border-color:var(--accent);}
+.users-summary{font-size:12px;color:var(--muted);margin-bottom:1rem;font-family:var(--mono);}
+
+/* ── SPINNER ── */
+.spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.2);
+      border-top-color:currentColor;border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+
+<!-- ════ LOGIN ════ -->
+<div id="login-screen">
+  <div class="login-box">
+    <h1><a href='https://parasktz.github.io/CultureBotEval-v2'>CULTUREBOTEVAL</a></h1>
+    <p>Admin Panel · Restricted Access</p>
+    <div class="field"><label>Email</label>
+      <input type="email" id="l-email" placeholder="admin@example.com"/>
+    </div>
+    <div class="field"><label>Password</label>
+      <input type="password" id="l-pass" placeholder="••••••••"/>
+    </div>
+    <button class="btn" onclick="doLogin()">Sign In</button>
+    <div class="err-msg" id="l-err"></div>
+  </div>
+</div>
+
+<!-- ════ APP ════ -->
+<div id="app">
+  <div class="sidebar">
+    <div class="sidebar-logo"><a href='https://parasktz.github.io/CultureBotEval-v2'>CULTUREBOTEVAL</a></div>
+    <div class="sidebar-sub">Admin Panel</div>
+    <a class="nav-item active" onclick="showPage('dashboard')">⬛ Dashboard</a>
+    <a class="nav-item" onclick="showPage('generate')">⚙ Generate Reports</a>
+    <a class="nav-item" onclick="showPage('history')">📂 Report History</a>
+    <a class="nav-item" onclick="showPage('users')">👥 Users</a>
+    <a class="nav-item" onclick="showPage('config')">🔧 Configuration</a>
+    <div class="sidebar-bottom">
+      <div class="user-tag" id="user-email"></div>
+      <button class="btn secondary sm" onclick="doLogout()">Sign Out</button>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <h2>Dashboard</h2>
+      <div class="page-sub" id="db-subtitle">Loading Firebase data…</div>
+      <div class="cards">
+        <div class="card"><div class="card-lbl">Sessions</div><div class="card-val" id="s-sessions">—</div></div>
+        <div class="card"><div class="card-lbl">Personas</div><div class="card-val" id="s-personas">—</div></div>
+        <div class="card"><div class="card-lbl">Unique Queries</div><div class="card-val" id="s-queries">—</div></div>
+        <div class="card"><div class="card-lbl">LLM Sources</div><div class="card-val" id="s-llms">—</div></div>
+        <div class="card"><div class="card-lbl">With Scores</div><div class="card-val" id="s-scored">—</div></div>
+        <div class="card"><div class="card-lbl">Reports</div><div class="card-val" id="s-reports">—</div></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn sm" onclick="showPage('generate')">⚙ Generate Now</button>
+        <button class="btn secondary sm" onclick="loadDashboard()">↻ Refresh</button>
+      </div>
+    </div>
+
+    <!-- GENERATE -->
+    <div class="page" id="page-generate">
+      <h2>Generate Reports</h2>
+      <div class="page-sub">Reads Firebase → generates 2 HTML files → pushes to GitHub</div>
+
+      <div class="gen-box">
+        <h3>GitHub Token</h3>
+        <p>Personal Access Token with <code>repo</code> scope. Stored locally in your browser.</p>
+        <div class="token-row">
+          <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxx"/>
+          <button class="btn sm" onclick="saveToken()">Save</button>
+        </div>
+      </div>
+
+      <div class="gen-box">
+        <h3>📊 File 1 — Session Statistics</h3>
+        <p>Replicates the structure of <em>statistics.html</em>: summary cards, persona blocks, queries per LLM. Generated from live Firebase sessions.</p>
+        <div class="gen-actions">
+          <button class="btn sm" onclick="generateAndPush(1)">
+            <span class="spin" id="spin1" style="display:none;"></span>
+            Generate &amp; Push
+          </button>
+          <button class="btn secondary sm" onclick="previewFile(1)">Preview</button>
+        </div>
+      </div>
+
+      <div class="gen-box">
+        <h3>📈 File 2 — Criteria Bar Charts</h3>
+        <p>For each (persona × query), a grouped horizontal bar chart: one axis = criteria, other = score, each LLM a different colour.</p>
+        <div class="gen-actions">
+          <button class="btn sm" onclick="generateAndPush(2)">
+            <span class="spin" id="spin2" style="display:none;"></span>
+            Generate &amp; Push
+          </button>
+          <button class="btn secondary sm" onclick="previewFile(2)">Preview</button>
+        </div>
+      </div>
+
+      <div class="gen-box">
+        <h3>🔍 Debug Evaluations</h3>
+        <p>Checks how many sessions have evaluations and shows the data structure detected.</p>
+        <div class="gen-actions">
+          <button class="btn secondary sm" onclick="debugEvaluations()">Check Evaluation Data</button>
+        </div>
+      </div>
+
+      <div class="gen-box">
+        <h3>⚡ Generate Both</h3>
+        <div class="gen-actions">
+          <button class="btn" onclick="generateBoth()">
+            <span class="spin" id="spinBoth" style="display:none;"></span>
+            Generate &amp; Push Both
+          </button>
+        </div>
+      </div>
+
+      <div class="log-box" id="gen-log"><span class="log-info">» Ready.</span></div>
+    </div>
+
+    <!-- HISTORY -->
+    <div class="page" id="page-history">
+      <h2>Report History</h2>
+      <div class="page-sub">All generated versions — visible only to admin.</div>
+      <button class="btn secondary sm" onclick="loadHistory()" style="margin-bottom:1rem;">↻ Refresh</button>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>Timestamp</th><th>File</th><th>Type</th><th>Sessions</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="history-tbody"><tr><td colspan="5" style="color:var(--muted)">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- USERS -->
+    <div class="page" id="page-users">
+      <h2>Users</h2>
+      <div class="page-sub">Manage user roles — toggle admin access directly from here.</div>
+      <input class="search-bar" id="user-search"
+             placeholder="Search by email…" oninput="filterUsers()"/>
+      <div class="users-summary" id="users-summary">Loading…</div>
+      <div id="users-list"></div>
+    </div>
+
+    <!-- CONFIG -->
+    <div class="page" id="page-config">
+      <h2>Configuration</h2>
+      <div class="page-sub">Firebase &amp; GitHub settings.</div>
+      <div class="cfg-grid">
+        <div class="cfg-row">
+          <label>GitHub Owner</label>
+          <input id="cfg-owner" value="parasktz"/>
+          <button class="btn sm" onclick="saveCfg()">Save</button>
+        </div>
+        <div class="cfg-row">
+          <label>GitHub Repo</label>
+          <input id="cfg-repo" value="CultureBotEval-v2"/>
+        </div>
+        <div class="cfg-row">
+          <label>Output folder (repo path)</label>
+          <input id="cfg-folder" value="reports"/>
+        </div>
+      </div>
+      <div style="margin-top:1rem;">
+        <button class="btn sm" onclick="saveCfg()">Save All</button>
+      </div>
+    </div>
+
+  </div><!-- .main -->
+</div><!-- #app -->
+
+<script>
+/* ═══════════════════════════════════════════════
+   FIREBASE CONFIG  ← αντικατέστησε με τις τιμές σου
+═══════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════ */
+firebase.initializeApp(FIREBASE_CONFIG);
+const auth = firebase.auth();
+const db   = firebase.database();
+
+let fbData = null;
+let cfg    = loadCfgLocal();
+
+auth.onAuthStateChanged(async user => {
+  if(user){
+    const admin = await isAdmin(user.uid);
+    if(admin){
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app').style.display          = 'flex';
+      document.getElementById('user-email').textContent     = user.email;
+      loadToken();
+      loadCfgFields();
+      loadDashboard();
+      loadHistory();
+    } else {
+      await auth.signOut();
+      setErr('Access denied — not an admin account.');
+    }
+  }
+});
+
+/* ═══════════════════════════════════════════════
+   AUTH
+═══════════════════════════════════════════════ */
+async function doLogin(){
+  const email = document.getElementById('l-email').value;
+  const pass  = document.getElementById('l-pass').value;
+  try{
+    await auth.signInWithEmailAndPassword(email, pass);
+  }catch(e){ setErr(e.message); }
+}
+async function doLogout(){ await auth.signOut(); location.reload(); }
+function setErr(m){ document.getElementById('l-err').textContent = m; }
+
+/* ═══════════════════════════════════════════════
+   ADMIN CHECK — Firebase only
+═══════════════════════════════════════════════ */
+async function isAdmin(uid){
+  const snap = await db.ref('admins/' + uid).once('value');
+  return snap.exists();
+}
+
+/* ═══════════════════════════════════════════════
+   NAV
+═══════════════════════════════════════════════ */
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  event.currentTarget && event.currentTarget.classList.add('active');
+  if(id==='users') loadUsers();
+}
+
+/* ═══════════════════════════════════════════════
+   FIREBASE READ
+═══════════════════════════════════════════════ */
+async function fetchFirebase(){
+  const [sessionsSnap, reportsSnap] = await Promise.all([
+    db.ref('sessions').once('value'),
+    db.ref('reports').once('value')
+  ]);
+  fbData = {
+    sessions: sessionsSnap.val() || {},
+    reports:  reportsSnap.val()  || {}
+  };
+  return fbData;
+}
+
+async function loadDashboard(){
+  await fetchFirebase();
+  const sessions = fbData.sessions || {};
+  const reports  = fbData.reports  || {};
+  const keys     = Object.keys(sessions);
+  const personas = [...new Set(keys.map(k=>sessions[k].personaTitle||''))].filter(Boolean);
+  const queries  = [...new Set(keys.map(k=>sessions[k].query||''))].filter(Boolean);
+  // Collect LLM labels from evaluation records (v2 nests them under llms.<k>.llmTitle).
+  const llmSet = new Set();
+  keys.forEach(k=>{
+    const ev = sessions[k].evaluations;
+    if(ev && typeof ev === 'object'){
+      const children = ev.ratings ? [ev] : Object.values(ev);
+      children.forEach(c=>{
+        if(!c || typeof c !== 'object') return;
+        if(c.ratings){ llmSet.add(detectLLM(sessions[k])); }
+        else if(c.llms && typeof c.llms === 'object'){
+          Object.values(c.llms).forEach(l=>{
+            if(l && typeof l === 'object' && l.ratings)
+              llmSet.add(detectLLM({llmTitle:l.llmTitle, llmSource:l.llmSource}));
+          });
+        }
+      });
+    }
+  });
+  const llms     = [...llmSet].filter(l=>l&&l!=='Unknown');
+  const scored   = keys.filter(k=>getLatestRatings(sessions[k])!==null).length;
+
+  document.getElementById('s-sessions').textContent = keys.length;
+  document.getElementById('s-personas').textContent = personas.length;
+  document.getElementById('s-queries').textContent  = queries.length;
+  document.getElementById('s-llms').textContent     = llms.length;
+  document.getElementById('s-scored').textContent   = scored;
+  document.getElementById('s-reports').textContent  = Object.keys(reports).length;
+  document.getElementById('db-subtitle').textContent =
+    `${keys.length} sessions · ${personas.length} personas · ${new Date().toLocaleString()}`;
+}
+
+function detectLLM(s){
+  const src = (s.llmSource||s.llmTitle||'').toLowerCase();
+  if(src.includes('chatgpt')||src.includes('gpt'))      return 'ChatGPT';
+  if(src.includes('gemini'))                             return 'Gemini';
+  if(src.includes('v3')||src.includes('scb3'))           return 'SearchCultureBot v3';
+  if(src.includes('v2')||src.includes('scb2'))           return 'SearchCultureBot v2';
+  if(src.includes('searchculture')||src.includes('bot')||src.includes('scb')) return 'SearchCultureBot v1';
+  // Fallback: suffix after dash
+  const t = s.llmTitle||'';
+  if(t.includes('–')){ const suf=t.split('–').pop().trim(); if(suf) return suf; }
+  if(t.includes('-')){ const suf=t.split('-').pop().trim(); if(suf&&suf.length<30) return suf; }
+  // Last resort: use llmTitle as-is
+  if(t && t.length < 40) return t;
+  return 'Unknown';
+}
+
+/* ═══════════════════════════════════════════════
+   DYNAMIC PER-LLM COLOURS
+   Brand colours for known LLMs + a distinct palette colour for ANY
+   custom-named LLM, so every LLM in a report gets its own colour.
+═══════════════════════════════════════════════ */
+const LLM_BRAND_COLORS = {
+  'ChatGPT':'#10a37f','Gemini':'#4285f4',
+  'SearchCultureBot v1':'#b14dd1','SearchCultureBot v2':'#7e57c2','SearchCultureBot v3':'#dc4b64'
+};
+const LLM_PALETTE = ['#10a37f','#4285f4','#b14dd1','#e8833a','#dc4b64','#2bb3a3',
+                     '#7e57c2','#c0a800','#5c8a3a','#3a7bd5','#d6478e','#8d6e63',
+                     '#00897b','#ef6c00','#5e35b1','#43a047'];
+function buildLlmColorMap(labels){
+  const map = {}, used = new Set();
+  labels.forEach(l=>{ if(LLM_BRAND_COLORS[l]){ map[l]=LLM_BRAND_COLORS[l]; used.add(map[l]); } });
+  let pi = 0;
+  labels.slice().sort().forEach(l=>{
+    if(map[l]) return;
+    while(used.has(LLM_PALETTE[pi % LLM_PALETTE.length]) && used.size < LLM_PALETTE.length) pi++;
+    const c = LLM_PALETTE[pi % LLM_PALETTE.length];
+    map[l] = c; used.add(c); pi++;
+  });
+  return map;
+}
+function textOnColor(hex){
+  const h = (hex||'#000').replace('#','');
+  const r=parseInt(h.slice(0,2),16), g=parseInt(h.slice(2,4),16), b=parseInt(h.slice(4,6),16);
+  return (0.299*r + 0.587*g + 0.114*b) > 150 ? '#0f0f0f' : '#ffffff';
+}
+
+/* ═══════════════════════════════════════════════
+   HISTORY
+═══════════════════════════════════════════════ */
+async function loadHistory(){
+  if(!fbData) await fetchFirebase();
+  const reports = fbData.reports || {};
+  const tbody   = document.getElementById('history-tbody');
+  const rows    = Object.entries(reports).sort((a,b)=>b[0].localeCompare(a[0]));
+  if(!rows.length){
+    tbody.innerHTML='<tr><td colspan="5" style="color:var(--muted)">No reports yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(([key,r])=>`
+    <tr>
+      <td style="font-family:var(--mono);font-size:11px;">${r.createdAt||key}</td>
+      <td><a class="link" href="${r.url||'#'}" target="_blank">${r.filename||key}</a></td>
+      <td><span class="chip ${r.type==='stats'?'v1':'v2'}">${r.type==='stats'?'Statistics':'Criteria Charts'}</span></td>
+      <td style="color:var(--muted);">${r.sessionCount||'—'}</td>
+      <td>
+        <a class="link" href="${r.url||'#'}" target="_blank">View</a>
+        ${r.latest?'<span class="chip" style="margin-left:6px;color:var(--green)">current</span>':''}
+      </td>
+    </tr>`).join('');
+}
+
+/* ═══════════════════════════════════════════════
+   USERS
+═══════════════════════════════════════════════ */
+let allUsers  = [];
+let adminUIDs = {};
+
+async function loadUsers(){
+  document.getElementById('users-summary').textContent = 'Loading…';
+  document.getElementById('users-list').innerHTML = '';
+
+  const [usersSnap, adminsSnap] = await Promise.all([
+    db.ref('users').once('value'),
+    db.ref('admins').once('value')
+  ]);
+
+  adminUIDs = adminsSnap.val() || {};
+  const usersRaw = usersSnap.val() || {};
+
+  allUsers = Object.entries(usersRaw).map(([uid, info])=>({
+    uid,
+    email:     info.email     || '—',
+    lastLogin: info.lastLogin || null,
+    isAdmin:   !!adminUIDs[uid]
+  }));
+
+  allUsers.sort((a,b)=>{
+    if(a.isAdmin !== b.isAdmin) return a.isAdmin ? -1 : 1;
+    return a.email.localeCompare(b.email);
+  });
+
+  filterUsers();
+}
+
+function filterUsers(){
+  const q = document.getElementById('user-search').value.toLowerCase();
+  renderUsers(q ? allUsers.filter(u=>u.email.toLowerCase().includes(q)) : allUsers);
+}
+
+function renderUsers(list){
+  const admins = list.filter(u=>u.isAdmin).length;
+  document.getElementById('users-summary').textContent =
+    `${list.length} user${list.length!==1?'s':''} · ${admins} admin${admins!==1?'s':''}`;
+
+  document.getElementById('users-list').innerHTML = list.length ? list.map(u=>`
+    <div class="user-card" id="ucard-${u.uid}">
+      <div class="user-avatar">${u.isAdmin ? '👑' : '👤'}</div>
+      <div class="user-info">
+        <div class="user-email">${esc(u.email)}</div>
+        <div class="user-meta">
+          UID: ${u.uid}
+          ${u.lastLogin ? ' · Last login: ' + new Date(u.lastLogin).toLocaleString('el-GR') : ''}
+        </div>
+      </div>
+      <div class="user-actions">
+        <button class="toggle-admin ${u.isAdmin?'is-admin':''}"
+                onclick="toggleAdmin('${u.uid}', ${u.isAdmin})">
+          ${u.isAdmin ? '★ Admin' : '☆ Make Admin'}
+        </button>
+      </div>
+    </div>`).join('')
+  : '<div style="color:var(--muted);font-size:13px;padding:1rem 0;">No users found.</div>';
+}
+
+async function toggleAdmin(uid, currentlyAdmin){
+  const me = auth.currentUser;
+  if(currentlyAdmin && me && me.uid === uid){
+    alert('Cannot remove your own admin role.');
+    return;
+  }
+  if(currentlyAdmin){
+    await db.ref('admins/' + uid).remove();
+    log('info', `Admin role removed from ${uid}`);
+  } else {
+    await db.ref('admins/' + uid).set(true);
+    log('info', `Admin role granted to ${uid}`);
+  }
+  const u = allUsers.find(u=>u.uid===uid);
+  if(u) u.isAdmin = !currentlyAdmin;
+  allUsers.sort((a,b)=>{
+    if(a.isAdmin !== b.isAdmin) return a.isAdmin ? -1 : 1;
+    return a.email.localeCompare(b.email);
+  });
+  filterUsers();
+}
+
+/* ═══════════════════════════════════════════════
+   CONFIG
+═══════════════════════════════════════════════ */
+function loadCfgLocal(){
+  try{ return JSON.parse(localStorage.getItem('cbe_cfg')||'{}'); }catch(e){return{};}
+}
+function loadCfgFields(){
+  // self-heal: upgrade an old saved repo name to v2
+  if(cfg.repo === 'CultureBotEval'){ cfg.repo = 'CultureBotEval-v2'; localStorage.setItem('cbe_cfg', JSON.stringify(cfg)); }
+  document.getElementById('cfg-owner').value  = cfg.owner  || 'parasktz';
+  document.getElementById('cfg-repo').value   = cfg.repo   || 'CultureBotEval-v2';
+  document.getElementById('cfg-folder').value = cfg.folder || 'reports';
+}
+function saveCfg(){
+  cfg.owner  = document.getElementById('cfg-owner').value.trim();
+  cfg.repo   = document.getElementById('cfg-repo').value.trim();
+  cfg.folder = document.getElementById('cfg-folder').value.trim();
+  localStorage.setItem('cbe_cfg', JSON.stringify(cfg));
+  log('info','Configuration saved.');
+}
+function loadToken(){
+  document.getElementById('gh-token').value = localStorage.getItem('cbe_gh_token')||'';
+}
+function saveToken(){
+  localStorage.setItem('cbe_gh_token', document.getElementById('gh-token').value.trim());
+  log('info','Token saved.');
+}
+function getToken(){ return document.getElementById('gh-token').value.trim(); }
+
+/* ═══════════════════════════════════════════════
+   LOG
+═══════════════════════════════════════════════ */
+function log(type, msg){
+  const box = document.getElementById('gen-log');
+  if(!box) return;
+  const cls = type==='ok'?'log-ok':type==='err'?'log-err':'log-info';
+  box.innerHTML += `<div class="${cls}">[${new Date().toLocaleTimeString()}] ${msg}</div>`;
+  box.scrollTop  = box.scrollHeight;
+}
+
+/* ═══════════════════════════════════════════════
+   GENERATE
+═══════════════════════════════════════════════ */
+async function generateAndPush(fileNum){
+  const spinId = fileNum===1?'spin1':'spin2';
+  setSpin(spinId,true);
+  log('info',`Starting File ${fileNum} generation…`);
+  try{
+    if(!fbData) await fetchFirebase();
+    const html     = fileNum===1 ? buildFile1(fbData) : buildFile2(fbData);
+    const ts       = datetimePrefix();
+    const filename = `${ts}_statistics${fileNum===1?'':'-criteria'}.html`;
+    await pushToGitHub(filename, html);
+    await saveReportRecord(filename, fileNum===1?'stats':'criteria', fbData);
+    await updateLatestPointerSingle(filename, fileNum===1?'stats':'criteria');
+    log('ok',`✓ ${filename} pushed & latest pointer updated.`);
+  }catch(e){ log('err','Error: '+e.message); }
+  setSpin(spinId,false);
+}
+
+async function generateBoth(){
+  setSpin('spinBoth',true);
+  log('info','Generating both files…');
+  try{
+    if(!fbData) await fetchFirebase();
+    const ts = datetimePrefix();
+    const f1 = `${ts}_statistics.html`;
+    const f2 = `${ts}_statistics-criteria.html`;
+    await pushToGitHub(f1, buildFile1(fbData));
+    log('ok',`✓ ${f1} pushed.`);
+    await pushToGitHub(f2, buildFile2(fbData));
+    log('ok',`✓ ${f2} pushed.`);
+    await saveReportRecord(f1, 'stats',    fbData);
+    await saveReportRecord(f2, 'criteria', fbData);
+    await updateLatestPointer(f1, f2);
+    log('ok','✓ Latest pointers updated. Done!');
+  }catch(e){ log('err','Error: '+e.message); }
+  setSpin('spinBoth',false);
+}
+
+async function previewFile(fileNum){
+  if(!fbData) await fetchFirebase();
+  const html = fileNum===1 ? buildFile1(fbData) : buildFile2(fbData);
+  const w = window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+}
+
+function setSpin(id,on){
+  const el = document.getElementById(id);
+  if(el) el.style.display = on?'inline-block':'none';
+}
+
+function datetimePrefix(){
+  const d=new Date(), pad=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
+
+/* ═══════════════════════════════════════════════
+   GITHUB API
+═══════════════════════════════════════════════ */
+async function pushToGitHub(filename, content){
+  const token  = getToken();
+  if(!token) throw new Error('GitHub token not set.');
+  const owner  = cfg.owner  || 'parasktz';
+  const repo   = cfg.repo   || 'CultureBotEval-v2';
+  const folder = cfg.folder || 'reports';
+  const path   = `${folder}/${filename}`;
+  const url    = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+  const encoded = btoa(unescape(encodeURIComponent(content)));
+
+  let sha;
+  try{
+    // Check if file exists to get sha for update. 404 is expected for new files.
+    const check = await fetch(url,{
+      method:'GET',
+      headers:{'Authorization':`token ${token}`,'Accept':'application/vnd.github.v3+json'}
+    });
+    if(check.ok){
+      const j = await check.json();
+      sha = j.sha;
+    }
+    // Silently ignore 404 — it just means the file doesn't exist yet.
+  }catch(e){
+    // Network errors ignored; PUT will fail with clearer message if real issue.
+  }
+
+  const body = {message:`Add ${filename}`, content:encoded};
+  if(sha) body.sha = sha;
+
+  const res = await fetch(url,{
+    method:'PUT',
+    headers:{'Authorization':`token ${token}`,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  });
+  if(!res.ok){
+    let err={};
+    try{ err = await res.json(); }catch(e){}
+    if(res.status === 401){
+      throw new Error(`GitHub 401: Το token δεν είναι έγκυρο ή έχει λήξει. Δημιούργησε νέο Personal Access Token και ξαναβάλ' το.`);
+    }
+    if(res.status === 403){
+      throw new Error(`GitHub 403 (Forbidden): Το token δεν έχει δικαίωμα εγγραφής στο "${owner}/${repo}". Έλεγξε ότι: (1) το token έχει scope "Contents: Read and write" (fine-grained) ή "repo" (classic), (2) έχει πρόσβαση στο συγκεκριμένο repository, και (3) το repo "${repo}" υπάρχει στον owner "${owner}".`);
+    }
+    if(res.status === 404){
+      throw new Error(`GitHub 404: Το repository "${owner}/${repo}" δεν βρέθηκε ή το token δεν έχει πρόσβαση σ' αυτό. Έλεγξε το όνομα στο Configuration.`);
+    }
+    throw new Error(err.message||res.statusText);
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   FIREBASE REPORT RECORDS
+═══════════════════════════════════════════════ */
+async function saveReportRecord(filename, type, data){
+  const owner  = cfg.owner  || 'parasktz';
+  const repo   = cfg.repo   || 'CultureBotEval-v2';
+  const folder = cfg.folder || 'reports';
+  const ghUrl  = `https://github.com/${owner}/${repo}/blob/main/${folder}/${filename}`;
+  const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/${folder}/${filename}`;
+
+  // 1. Push new record with millisecond timestamp for reliable sorting
+  const newRef = await db.ref('reports').push({
+    filename, type,
+    createdAt:    new Date().toLocaleString('el-GR'),
+    createdAtMs:  Date.now(),
+    url: ghUrl, rawUrl,
+    sessionCount: Object.keys(data.sessions||{}).length,
+    latest: true
+  });
+  const newKey = newRef.key;
+
+  // 2. Retention: keep only THE latest report per type. Delete all older
+  //    records (regardless of type), so Firebase `reports` never grows
+  //    beyond 1 stats + 1 criteria = 2 records max total.
+  const allSnap = await db.ref('reports').once('value');
+  const all = [];
+  allSnap.forEach(c => {
+    const v = c.val() || {};
+    all.push({
+      key: c.key,
+      type: v.type || '—',
+      filename: v.filename || '',
+      createdAtMs: v.createdAtMs || 0
+    });
+  });
+
+  // Group by type, keep latest per group, delete rest
+  const byType = {};
+  all.forEach(r => {
+    if(!byType[r.type]) byType[r.type] = [];
+    byType[r.type].push(r);
+  });
+
+  const toDelete = [];
+  Object.entries(byType).forEach(([t, arr])=>{
+    arr.sort((a,b)=>{
+      const ams = a.createdAtMs || 0, bms = b.createdAtMs || 0;
+      if(ams !== bms) return bms - ams; // newest first
+      return String(b.filename).localeCompare(String(a.filename));
+    });
+    // Keep first (latest), delete rest
+    arr.slice(1).forEach(r => toDelete.push(r));
+  });
+
+  log('info', `Retention: ${all.length} records total, deleting ${toDelete.length}`);
+
+  if(toDelete.length){
+    const deletes = {};
+    toDelete.forEach(r => {
+      deletes[`reports/${r.key}`] = null;
+      log('info', `  ✗ delete ${r.type}: ${r.filename}`);
+    });
+    await db.ref().update(deletes);
+    log('ok', `Deleted ${toDelete.length} old report record${toDelete.length===1?'':'s'}`);
+  }
+}
+
+async function updateLatestPointer(f1, f2){
+  const owner  = cfg.owner  || 'parasktz';
+  const repo   = cfg.repo   || 'CultureBotEval-v2';
+  const folder = cfg.folder || 'reports';
+  // Use raw.githubusercontent.com — propagates instantly, no GitHub Pages required
+  await db.ref('latestReports').update({
+    stats:    `https://raw.githubusercontent.com/${owner}/${repo}/main/${folder}/${f1}`,
+    criteria: `https://raw.githubusercontent.com/${owner}/${repo}/main/${folder}/${f2}`,
+    updatedAt: new Date().toISOString()
+  });
+}
+
+async function updateLatestPointerSingle(filename, type){
+  const owner  = cfg.owner  || 'parasktz';
+  const repo   = cfg.repo   || 'CultureBotEval-v2';
+  const folder = cfg.folder || 'reports';
+  const url    = `https://raw.githubusercontent.com/${owner}/${repo}/main/${folder}/${filename}`;
+  await db.ref('latestReports').update({
+    [type]: url,
+    updatedAt: new Date().toISOString()
+  });
+}
+
+/* ═══════════════════════════════════════════════
+   EVALUATION HELPERS
+═══════════════════════════════════════════════ */
+
+// Handles all possible Firebase structures for evaluations:
+// Structure A: session.evaluations.ratings (single evaluation)
+// Structure B: session.evaluations.<pushKey>.ratings (multiple evaluations)
+// Structure C: session.evaluations.<pushKey>.llms.<llmKey>.ratings (per-LLM ratings, v2)
+//
+// Returns true if an object (evaluation child) carries ratings in any shape.
+function hasAnyRatings(obj){
+  if(!obj || typeof obj !== 'object') return false;
+  if(obj.ratings) return true;
+  if(obj.llms && typeof obj.llms === 'object'){
+    return Object.values(obj.llms).some(l => l && typeof l === 'object' && l.ratings);
+  }
+  return false;
+}
+
+function getLatestRatings(session){
+  const ev = session.evaluations;
+  if(!ev || typeof ev !== 'object') return null;
+
+  // Structure A: direct ratings field
+  if(ev.ratings && typeof ev.ratings === 'object'){
+    return ev.ratings;
+  }
+
+  // Structure B/C: collection of evaluation records (push keys)
+  let latest = null;
+  let latestTs = '';
+  Object.values(ev).forEach(child => {
+    if(child && typeof child === 'object' && hasAnyRatings(child)){
+      const ts = child.timestamp || '';
+      if(!latest || ts > latestTs){
+        // Prefer direct ratings; otherwise first per-LLM ratings found
+        if(child.ratings){
+          latest = child.ratings;
+        } else {
+          const firstLlm = Object.values(child.llms).find(l => l && l.ratings);
+          latest = firstLlm ? firstLlm.ratings : null;
+        }
+        latestTs = ts;
+      }
+    }
+  });
+  return latest;
+}
+
+async function debugEvaluations(){
+  log('info', '--- DEBUG: Checking evaluation data ---');
+  if(!fbData) await fetchFirebase();
+  const sessions = fbData.sessions || {};
+  const keys = Object.keys(sessions);
+  log('info', `Total sessions: ${keys.length}`);
+
+  let countA = 0, countB = 0, countNone = 0, sample = null;
+
+  keys.forEach(k => {
+    const s   = sessions[k];
+    const ev  = s.evaluations;
+    if(!ev){ countNone++; return; }
+
+    if(ev.ratings){
+      countA++;
+      if(!sample) sample = {key:k, structure:'A (direct ratings)', ratings:ev.ratings};
+    } else {
+      // Check for push key children (Structure B/C)
+      const hasChild = Object.values(ev).some(c=>c && typeof c==='object' && hasAnyRatings(c));
+      if(hasChild){
+        countB++;
+        if(!sample){
+          const child = Object.values(ev).find(c=>c && hasAnyRatings(c));
+          const r = child.ratings || (Object.values(child.llms||{}).find(l=>l&&l.ratings)||{}).ratings;
+          sample = {key:k, structure:'B/C (collection)', ratings:r};
+        }
+      } else {
+        countNone++;
+      }
+    }
+  });
+
+  log('ok', `Structure A (direct): ${countA} sessions`);
+  log('ok', `Structure B (collection): ${countB} sessions`);
+  log(countNone>0?'err':'ok', `No evaluations: ${countNone} sessions`);
+
+  if(sample){
+    log('info', `Sample session [${sample.key}] — Structure: ${sample.structure}`);
+    log('info', `Ratings: ${JSON.stringify(sample.ratings)}`);
+    const s = sessions[sample.key];
+    log('info', `LLM detected as: "${detectLLM(s)}" (llmTitle: "${s.llmTitle||'—'}")`);
+    log('info', `Persona: "${s.personaTitle||'—'}"`);
+    log('info', `Query: "${(s.query||'—').substring(0,60)}..."`);
+  } else {
+    log('err', 'No sessions with evaluations found!');
+  }
+
+  // ==== Enhanced: Dump per-persona evaluator counts ====
+  log('info', '--- Per-persona evaluator counts ---');
+  const stats = {};
+  keys.forEach(k=>{
+    const s  = sessions[k];
+    const pt = s.personaTitle || 'Unknown';
+    const ev = s.evaluations;
+    let evalCount = 0;
+    if(ev && typeof ev === 'object'){
+      if(ev.ratings){
+        evalCount = 1;
+      } else {
+        Object.entries(ev).forEach(([kk, child])=>{
+          if(!child || typeof child !== 'object') return;
+          if(kk === 'timestamp' || kk === 'metadata' || kk === 'by') return;
+          if(hasAnyRatings(child)) evalCount++;
+        });
+      }
+    }
+    if(!stats[pt]) stats[pt] = {sessions:0, evaluations:0, withEvals:0};
+    stats[pt].sessions++;
+    stats[pt].evaluations += evalCount;
+    if(evalCount > 0) stats[pt].withEvals++;
+  });
+
+  Object.entries(stats).sort((a,b)=>b[1].evaluations-a[1].evaluations).forEach(([pt, v])=>{
+    const tag = v.evaluations > 0 ? 'ok' : 'info';
+    log(tag, `  [${v.evaluations} evals] ${v.sessions} sess · ${v.withEvals} sess-w-evals · ${pt}`);
+  });
+
+  log('info', '--- END DEBUG ---');
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   FILE 1 — SESSION STATISTICS
+═══════════════════════════════════════════════════════════════════ */
+function buildFile1(data){
+  const sessions = data.sessions || {};
+  const allKeys  = Object.keys(sessions);
+
+  // Extract evaluator IDs from a session (list, since Structure B can have many)
+  function getEvaluatorIds(s){
+    const ev = s.evaluations;
+    if(!ev || typeof ev !== 'object') return [];
+    const ids = [];
+    const extractId = (obj, fallback) =>
+      obj.evaluatorId || obj.evaluatorUid || obj.uid || obj.userId ||
+      obj.by || obj.author || obj.email || fallback;
+
+    if(ev.ratings){
+      // Structure A: single evaluation on the session
+      ids.push(extractId(ev, s.creatorUid || s.id || 'anon'));
+    } else {
+      // Structure B/C: evaluations/<pushKey>/(ratings | llms.<k>.ratings)
+      Object.entries(ev).forEach(([k, child])=>{
+        if(!child || typeof child !== 'object') return;
+        if(k === 'timestamp' || k === 'metadata' || k === 'by') return;
+        if(hasAnyRatings(child)) ids.push(extractId(child, k)); // fallback = push key
+      });
+    }
+    return ids;
+  }
+
+  // byPersona[persona][query][llm] = { sessions:N, evaluators:M }
+  const byPersona = {};
+  const perPersonaEvaluators = {}; // Set per persona of unique evaluator IDs
+  const allEvaluators = new Set();
+
+  // Derive {llmLabel: evaluatorCount} for a session from its evaluation records.
+  // v2: ratings live under evaluations.<key>.llms.<k>.ratings, with llmTitle per LLM.
+  // Falls back to session-level detectLLM for the old direct-ratings shape.
+  function getLlmEvaluatorCounts(s){
+    const ev = s.evaluations;
+    const counts = {}; // llmLabel -> number of evaluator contributions
+    if(!ev || typeof ev !== 'object') return counts;
+    const children = ev.ratings
+      ? [ev]
+      : Object.entries(ev)
+          .filter(([k,c])=> c && typeof c==='object' && k!=='timestamp' && k!=='metadata' && k!=='by')
+          .map(([,c])=>c);
+    children.forEach(child=>{
+      if(child.ratings){
+        const l = detectLLM(s);
+        counts[l] = (counts[l]||0) + 1;
+      } else if(child.llms && typeof child.llms === 'object'){
+        Object.values(child.llms).forEach(l=>{
+          if(l && typeof l === 'object' && l.ratings){
+            const label = detectLLM({llmTitle:l.llmTitle, llmSource:l.llmSource});
+            counts[label] = (counts[label]||0) + 1;
+          }
+        });
+      }
+    });
+    return counts;
+  }
+
+  allKeys.forEach(k=>{
+    const s   = sessions[k];
+    const pt  = s.personaTitle || 'Unknown';
+    const q   = s.query || '';
+    const evalIds = getEvaluatorIds(s);
+
+    evalIds.forEach(id=>{
+      allEvaluators.add(id);
+      if(!perPersonaEvaluators[pt]) perPersonaEvaluators[pt] = new Set();
+      perPersonaEvaluators[pt].add(id);
+    });
+
+    if(!byPersona[pt])    byPersona[pt]    = {};
+    if(!byPersona[pt][q]) byPersona[pt][q] = {};
+
+    const llmCounts = getLlmEvaluatorCounts(s);
+    const llmLabels = Object.keys(llmCounts);
+    // Ensure the session is represented even if it has no evaluations yet.
+    if(!llmLabels.length){
+      const l = detectLLM(s);
+      if(!byPersona[pt][q][l]) byPersona[pt][q][l] = { sessions:0, evaluators:0 };
+      byPersona[pt][q][l].sessions++;
+    } else {
+      llmLabels.forEach(l=>{
+        if(!byPersona[pt][q][l]) byPersona[pt][q][l] = { sessions:0, evaluators:0 };
+        byPersona[pt][q][l].sessions++;
+        byPersona[pt][q][l].evaluators += llmCounts[l];
+      });
+    }
+  });
+
+  const personaLabels = Object.keys(byPersona);
+  const totalQueries  = personaLabels.reduce((a,p)=>a+Object.keys(byPersona[p]).length,0);
+  const llmSet = new Set();
+  personaLabels.forEach(p=>Object.values(byPersona[p]).forEach(qMap=>Object.keys(qMap).forEach(l=>llmSet.add(l))));
+  const llmList = [...llmSet].filter(l=>l&&l!=='Unknown');
+  const totalEvals = allKeys.reduce((a,k)=>a+getEvaluatorIds(sessions[k]).length,0);
+
+  const llmColorMap = buildLlmColorMap(llmList);
+  const llmChip = (l, evals, sessCount) => {
+    const bg = llmColorMap[l] || '#6b7280';
+    const fg = textOnColor(bg);
+    const title = `${evals} evaluator${evals===1?'':'s'} across ${sessCount} session${sessCount===1?'':'s'}`;
+    return `<span class="llm" style="background:${bg};color:${fg};border-color:transparent;" title="${title}">${esc(l)}<span class="llm-chip-count${evals===0?' zero':''}">${evals}</span></span>`;
+  };
+
+  const rolesHtml = personaLabels.map(pt=>{
+    const qMap  = byPersona[pt];
+    const qKeys = Object.keys(qMap);
+    const totalSessions = qKeys.reduce((a,q)=>{
+      return a + Object.values(qMap[q]).reduce((b,rec)=>b+rec.sessions, 0);
+    },0);
+    const totalEvalsPersona = qKeys.reduce((a,q)=>{
+      return a + Object.values(qMap[q]).reduce((b,rec)=>b+rec.evaluators, 0);
+    },0);
+    const uniqueEvaluatorsPersona = (perPersonaEvaluators[pt] || new Set()).size;
+    const rows = qKeys.map((q,i)=>{
+      const llmEntries = Object.entries(qMap[q]);
+      return `
+      <div class="q-row">
+        <div class="q-idx">${i+1}</div>
+        <div class="q-body">
+          <div class="q-text">${esc(q)}</div>
+          <div class="llms">${llmEntries.map(([l,rec])=>llmChip(l, rec.evaluators, rec.sessions)).join('')}</div>
+        </div>
+      </div>`;
+    }).join('');
+    return `
+    <div class="role-block">
+      <div class="role-head">
+        <div class="role-text">${esc(pt)}</div>
+        <div class="badges">
+          <span class="badge b-blue">${qKeys.length} quer${qKeys.length!==1?'ies':'y'}</span>
+          <span class="badge b-green">${totalSessions} session${totalSessions!==1?'s':''}</span>
+          <span class="badge b-amber">${totalEvalsPersona} evaluation${totalEvalsPersona!==1?'s':''}</span>
+          <span class="badge b-purple">${uniqueEvaluatorsPersona} unique evaluator${uniqueEvaluatorsPersona!==1?'s':''}</span>
+        </div>
+      </div>
+      <div class="q-list">${rows}</div>
+    </div>`;
+  }).join('');
+
+  const legendItems = llmList.slice().sort().map(l=>{
+    const bg = llmColorMap[l] || '#6b7280';
+    const fg = textOnColor(bg);
+    return `<span class="llm" style="background:${bg};color:${fg};border-color:transparent;padding:3px 10px;font-size:12px;">${esc(l)}</span>`;
+  }).join('');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>CultureBotEval — Statistics</title>
+<style>
+:root{--bg:#f4f3ee;--card:#fff;--border:rgba(0,0,0,.09);--text:#18180f;--muted:#68685f;
+  --blue:#2b7fd4;--blue-bg:#e8f2fc;--blue-t:#0a3d6e;--green-bg:#e0f4ec;--green-t:#074d35;--r:10px;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);padding:2rem 1.25rem 4rem;}
+.wrap{max-width:980px;margin:0 auto;}
+h1{font-size:22px;font-weight:500;margin-bottom:.3rem;}
+.subtitle{font-size:13px;color:var(--muted);margin-bottom:2rem;}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:2rem;}
+.stat{background:var(--card);border:.5px solid var(--border);border-radius:var(--r);padding:.9rem 1.1rem;}
+.stat-lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;}
+.stat-val{font-size:26px;font-weight:500;color:var(--blue-t);}
+.role-block{background:var(--card);border:.5px solid var(--border);border-radius:var(--r);margin-bottom:1.25rem;overflow:hidden;}
+.role-head{padding:.85rem 1.25rem;background:var(--blue-bg);border-bottom:.5px solid rgba(43,127,212,.18);
+           display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+.role-text{font-size:14px;font-weight:600;color:var(--blue-t);line-height:1.5;}
+.badges{display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;margin-top:2px;}
+.badge{font-size:11px;border-radius:4px;padding:2px 8px;font-weight:500;white-space:nowrap;}
+.b-blue{background:var(--blue-bg);color:var(--blue-t);border:.5px solid rgba(43,127,212,.2);}
+.b-green{background:var(--green-bg);color:var(--green-t);}
+.b-amber{background:#fff4e0;color:#8a4a00;border:.5px solid rgba(138,74,0,.18);}
+.b-purple{background:#ede7f6;color:#4527a0;border:.5px solid rgba(69,39,160,.18);}
+.q-list{padding:.4rem 0;}
+.q-row{padding:.65rem 1.25rem;border-bottom:.5px solid var(--border);display:flex;align-items:flex-start;gap:10px;}
+.q-row:last-child{border-bottom:none;}
+.q-idx{min-width:22px;height:22px;border-radius:50%;background:var(--bg);color:var(--muted);
+       font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;}
+.q-body{flex:1;min-width:0;}
+.q-text{font-size:13px;color:var(--text);line-height:1.6;margin-bottom:6px;word-break:break-word;white-space:pre-wrap;}
+.llms{display:flex;flex-wrap:wrap;gap:4px;}
+.llm{font-size:11px;border-radius:4px;padding:2px 9px;border:.5px solid var(--border);color:var(--muted);background:var(--bg);
+     display:inline-flex;align-items:center;gap:5px;}
+.llm-chip-count{background:rgba(0,0,0,.15);padding:0 6px;border-radius:999px;
+                font-size:10px;font-weight:700;min-width:14px;text-align:center;line-height:1.5;}
+.llm-chip-count.zero{background:rgba(0,0,0,.06);color:rgba(0,0,0,.35);font-weight:500;}
+.llm.chatgpt{background:#fff3e0;color:#7a3c00;border-color:rgba(122,60,0,.15);}
+.llm.gemini {background:#e8f5e9;color:#1b5e20;border-color:rgba(27,94,32,.15);}
+.llm.scb1   {background:var(--blue-bg);color:var(--blue-t);border-color:rgba(43,127,212,.15);}
+.llm.scb2   {background:#ede7f6;color:#4527a0;border-color:rgba(69,39,160,.15);}
+.llm.scb3   {background:#fce4ec;color:#880e4f;border-color:rgba(136,14,79,.15);}
+.legend{margin-top:1.5rem;display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+.leg-lbl{font-size:12px;color:var(--muted);margin-right:4px;}
+.gen-info{font-size:11px;color:var(--muted);margin-top:2rem;padding-top:1rem;border-top:.5px solid var(--border);font-family:monospace;}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>CultureBotEval — Session Statistics</h1>
+<div class="subtitle">${allKeys.length} sessions · ${llmList.length} LLMs · ${new Date().toLocaleDateString('el-GR')}</div>
+<div class="summary">
+  <div class="stat"><div class="stat-lbl">Sessions</div><div class="stat-val">${allKeys.length}</div></div>
+  <div class="stat"><div class="stat-lbl">Persona Groups</div><div class="stat-val">${personaLabels.length}</div></div>
+  <div class="stat"><div class="stat-lbl">Unique Queries</div><div class="stat-val">${totalQueries}</div></div>
+  <div class="stat"><div class="stat-lbl">LLMs</div><div class="stat-val">${llmList.length}</div></div>
+  <div class="stat"><div class="stat-lbl">Evaluations</div><div class="stat-val">${totalEvals}</div></div>
+  <div class="stat"><div class="stat-lbl">Unique Evaluators</div><div class="stat-val">${allEvaluators.size}</div></div>
+</div>
+${rolesHtml}
+<div class="legend"><span class="leg-lbl">LLMs:</span>${legendItems}</div>
+<div class="gen-info">Generated: ${new Date().toISOString()} · CultureBotEval Admin</div>
+</div>
+<script>function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}<\/script>
+</body></html>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   FILE 2 — CRITERIA BAR CHARTS
+═══════════════════════════════════════════════════════════════════ */
+function buildFile2(data){
+  const sessions = data.sessions || {};
+
+  // 10 criteria with exact levels from evaluation.html
+  const CRIT_DEFS = [
+    {name:'1. Hallucination Flag',                       levels:['No Hallucination','Minor Hallucination','Major Hallucination','Cannot Determine']},
+    {name:'2. Query Relevance',                          levels:['Fully Relevant','Mostly Relevant','Partially Relevant','Not Relevant']},
+    {name:'3. Justification Quality',                    levels:['Excellent','Good','Fair','Poor']},
+    {name:'4. Evidence Grounding',                       levels:['Well Grounded','Mostly Grounded','Partially Grounded','Ungrounded']},
+    {name:'5. Clarity',                                  levels:['Very Clear','Clear','Somewhat Clear','Unclear']},
+    {name:'6. Result Usefulness',                        levels:['Very Useful','Useful','Somewhat Useful','Not Useful']},
+    {name:'7. Bias',                                     levels:['No Bias','Slight Bias','Moderate Bias','Significant Bias']},
+    {name:'8. Diversity',                                levels:['High','Moderate','Low','None']},
+    {name:'9. Completeness / Variety / Representative',  levels:['Excellent','Good','Fair','Poor']},
+    {name:'10. Needed Logical Steps',                    levels:['All Present','Mostly Present','Partially Present','Missing']}
+  ];
+
+  // Helper: array [null,"v1","v2"...] or object {"1":"v1","2":"v2"}
+  function getRating(ratings, idx1Based){
+    if(Array.isArray(ratings)) return ratings[idx1Based] ?? null;
+    return ratings[String(idx1Based)] ?? null;
+  }
+
+  // LLM solid colors (for Chart.js bars)
+  const LLM_COLORS = {
+    'ChatGPT':             '#10a37f',
+    'Gemini':              '#4285f4',
+    'SearchCultureBot v1': '#b14dd1',
+    'SearchCultureBot v2': '#7e57c2',
+    'SearchCultureBot v3': '#dc4b64'
+  };
+
+  // ════════════ Aggregate: persona → query → criterion → llm → distribution ════════════
+  const DATA = { personas:{}, summary:{personas:0,queries:0,evals:0,llms:new Set(),evaluators:new Set()} };
+  const persRoleById = {}; // remember first encountered role/guidelines per persona
+
+  // Helper: extract evaluator ID from an evaluation record
+  function extractEvalId(obj, fallback){
+    return obj.evaluatorId || obj.evaluatorUid || obj.uid || obj.userId ||
+           obj.by || obj.author || obj.email || fallback;
+  }
+
+  // First pass: collect all evaluations, keep ALL evaluator ratings (not just "latest")
+  // so that histograms count ALL ratings from all evaluators
+  const grouped = {}; // { persona: { query: { llm: [ratings, ratings, ...] } } }
+
+  Object.values(sessions).forEach(s=>{
+    const ev = s.evaluations;
+    if(!ev || typeof ev !== 'object') return;
+
+    const persona = s.personaTitle || 'Unknown';
+    const query   = s.query || '';
+    if(!query) return;
+
+    // Normalise evaluation records into a flat list of children to scan.
+    // Structure A: ev itself is the record. Structure B/C: ev.<pushKey>.
+    const children = ev.ratings
+      ? [ev]
+      : Object.entries(ev)
+          .filter(([k,c])=> c && typeof c==='object' && k!=='timestamp' && k!=='metadata' && k!=='by')
+          .map(([,c])=>c);
+
+    children.forEach(child=>{
+      const evId = extractEvalId(child, s.creatorUid || s.id || 'anon');
+
+      // Build {llmLabel: ratings} pairs for this evaluation.
+      const pairs = [];
+      if(child.ratings){
+        // Old shape: ratings sit directly on the record; LLM from the session.
+        pairs.push([detectLLM(s), child.ratings]);
+      } else if(child.llms && typeof child.llms === 'object'){
+        // v2 shape: per-LLM ratings nested under llms.<key>.
+        Object.values(child.llms).forEach(l=>{
+          if(l && typeof l === 'object' && l.ratings){
+            pairs.push([detectLLM({llmTitle:l.llmTitle, llmSource:l.llmSource}), l.ratings]);
+          }
+        });
+      }
+      if(!pairs.length) return;
+
+      // This evaluator contributed at least one rating to this session.
+      DATA.summary.evaluators.add(evId);
+
+      pairs.forEach(([llm, ratings])=>{
+        if(llm === 'Unknown') return;
+        if(!grouped[persona])              grouped[persona]              = {};
+        if(!grouped[persona][query])       grouped[persona][query]       = {};
+        if(!grouped[persona][query][llm])  grouped[persona][query][llm]  = [];
+        grouped[persona][query][llm].push(ratings);
+      });
+
+      // Remember role/guidelines
+      if(!persRoleById[persona]){
+        persRoleById[persona] = {
+          role: s.personaRole || '',
+          guidelines: s.personaGuidelines || ''
+        };
+      }
+    });
+  });
+
+  // Second pass: compute distributions per criterion per llm
+  Object.entries(grouped).forEach(([persona, qMap])=>{
+    const pData = {
+      title: persona,
+      role: persRoleById[persona]?.role || '',
+      guidelines: persRoleById[persona]?.guidelines || '',
+      evalCount: 0,
+      llms: new Set(),
+      queries: {}
+    };
+
+    Object.entries(qMap).forEach(([query, llmMap])=>{
+      const llmList = Object.keys(llmMap);
+      llmList.forEach(l => { pData.llms.add(l); DATA.summary.llms.add(l); });
+
+      // Total evaluations for this query (sum across all LLMs' rating lists)
+      let qEvalCount = 0;
+      const perLlmCount = {};
+      Object.entries(llmMap).forEach(([llm, arr])=>{
+        qEvalCount += arr.length;
+        perLlmCount[llm] = arr.length;
+      });
+      pData.evalCount += qEvalCount;
+      DATA.summary.evals += qEvalCount;
+
+      // Build per-criterion data: for each criterion, for each LLM, count per level
+      const criteria = CRIT_DEFS.map((def, cIdx)=>{
+        const idx1 = cIdx + 1;
+        const perLlm = {};
+        llmList.forEach(llm=>{
+          const counts = {};
+          def.levels.forEach(l => counts[l] = 0);
+          let n = 0;
+          llmMap[llm].forEach(ratings=>{
+            const val = getRating(ratings, idx1);
+            if(val && counts[val] !== undefined){
+              counts[val]++;
+              n++;
+            }
+          });
+          perLlm[llm] = { counts, total:n };
+        });
+        return { name:def.name, levels:def.levels, perLlm };
+      });
+
+      pData.queries[query] = {
+        text: query,
+        evalCount: qEvalCount,
+        llms: llmList,
+        perLlmCount,
+        criteria
+      };
+    });
+
+    pData.llms = Array.from(pData.llms);
+    DATA.personas[persona] = pData;
+    DATA.summary.personas++;
+    DATA.summary.queries += Object.keys(pData.queries).length;
+  });
+
+  const allLlmLabels = Array.from(DATA.summary.llms);
+  DATA.summary.llms       = DATA.summary.llms.size;
+  DATA.summary.evaluators = DATA.summary.evaluators.size;
+  const dataJson  = JSON.stringify(DATA).replace(/</g,'\\u003c');
+  // Complete colour map: every distinct LLM (incl. custom-named) gets its own colour
+  const colorsJS  = JSON.stringify(buildLlmColorMap(allLlmLabels));
+
+  // ═════════════════════════════ HTML OUTPUT ═════════════════════════════
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Criteria Histograms — CultureBotEval</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"><\/script>
+<style>
+:root{
+  --bg:#f4f3ee; --card:#fff; --border:rgba(0,0,0,.09);
+  --text:#18180f; --muted:#68685f; --muted-2:#a8a89e;
+  --blue-t:#0a3d6e;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+     background:var(--bg);color:var(--text);padding:1.5rem 1.5rem 3rem;
+     max-width:1200px;margin:0 auto;}
+
+.meta-stamp{font-size:10.5px;color:var(--muted-2);text-align:right;margin-bottom:.5rem;}
+h1.title{font-size:22px;font-weight:500;margin-bottom:.3rem;}
+.subtitle{font-size:13px;color:var(--muted);margin-bottom:.8rem;}
+
+/* Summary chips */
+.summary{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.2rem;}
+.summary-chip{background:var(--card);border:.5px solid var(--border);border-radius:999px;
+              padding:.35rem .9rem;font-size:11.5px;color:var(--muted);
+              display:inline-flex;align-items:center;gap:6px;}
+.summary-chip strong{color:var(--text);font-weight:600;}
+
+/* Persona pills */
+/* Persona nav wrapper with scroll arrows */
+.persona-nav-wrap{position:relative;margin-bottom:1.5rem;border-bottom:.5px solid var(--border);padding-bottom:.5rem;}
+.persona-nav{display:flex;gap:.4rem;overflow-x:auto;scrollbar-width:none;scroll-behavior:smooth;
+             padding:0 38px;}
+.persona-nav::-webkit-scrollbar{display:none;}
+.nav-arrow{position:absolute;top:0;bottom:.5rem;width:32px;
+           display:flex;align-items:center;justify-content:center;
+           background:var(--bg);border:.5px solid var(--border);border-radius:6px;
+           color:var(--muted);cursor:pointer;font-size:16px;font-weight:600;
+           transition:all .15s ease;z-index:2;user-select:none;font-family:inherit;padding:0;}
+.nav-arrow:hover{color:var(--text);background:var(--card);border-color:var(--muted-2);
+                 box-shadow:0 2px 8px rgba(0,0,0,.06);}
+.nav-arrow:disabled{opacity:.25;cursor:not-allowed;background:transparent;box-shadow:none;}
+.nav-arrow.left{left:0;}
+.nav-arrow.right{right:0;}
+.persona-pill{background:transparent;border:.5px solid var(--border);color:var(--muted);
+              padding:.5rem .95rem;border-radius:999px;font-size:12.5px;font-weight:500;
+              cursor:pointer;white-space:nowrap;transition:all .15s ease;font-family:inherit;flex-shrink:0;}
+.persona-pill:hover{color:var(--text);border-color:var(--muted-2);}
+.persona-pill.active{background:var(--blue-t);color:#fff;border-color:var(--blue-t);}
+.persona-pill .count{display:inline-block;margin-left:6px;padding:1px 7px;
+                     background:rgba(0,0,0,.06);border-radius:999px;font-size:10.5px;}
+.persona-pill.active .count{background:rgba(255,255,255,.2);}
+
+/* Persona header */
+.persona-header{margin-bottom:1.5rem;}
+.persona-label{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+               color:var(--muted);margin-bottom:.4rem;}
+.persona-title{font-size:26px;font-weight:600;line-height:1.2;margin-bottom:.5rem;}
+.persona-meta{font-size:12.5px;color:var(--muted);line-height:1.5;max-width:720px;}
+.persona-meta strong{color:var(--text);font-weight:500;}
+
+.section-head{font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+              color:var(--muted);margin:1.5rem 0 .75rem;
+              display:flex;align-items:center;gap:8px;}
+.section-head::after{content:'';flex:1;height:.5px;background:var(--border);}
+
+/* Accordion */
+.query-list{display:flex;flex-direction:column;gap:.5rem;}
+.query-card{background:var(--card);border:.5px solid var(--border);border-radius:10px;
+            overflow:hidden;transition:box-shadow .2s ease;}
+.query-card:hover{box-shadow:0 2px 12px rgba(0,0,0,.04);}
+.query-card.open{box-shadow:0 4px 20px rgba(0,0,0,.06);}
+.query-head{display:flex;align-items:center;gap:.85rem;padding:.95rem 1.1rem;
+            cursor:pointer;user-select:none;transition:background .12s ease;}
+.query-head:hover{background:rgba(0,0,0,.015);}
+.query-chevron{flex-shrink:0;width:16px;height:16px;color:var(--muted-2);
+               transition:transform .25s ease;}
+.query-card.open .query-chevron{transform:rotate(90deg);}
+.query-title{flex:1;font-size:13.5px;color:var(--text);font-weight:500;
+             line-height:1.45;word-break:break-word;}
+.query-badges{display:flex;gap:.35rem;flex-shrink:0;flex-wrap:wrap;
+              justify-content:flex-end;max-width:40%;}
+.llm-badge{font-size:10.5px;padding:2px 8px;border-radius:999px;color:#fff;
+           font-weight:500;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;}
+.llm-badge-count{background:rgba(255,255,255,.28);padding:0 6px;border-radius:999px;
+                 font-size:10px;font-weight:600;min-width:14px;text-align:center;}
+.query-evals{font-size:11px;color:var(--muted);background:rgba(0,0,0,.04);
+             padding:2px 8px;border-radius:999px;white-space:nowrap;}
+
+.query-body{max-height:0;overflow:hidden;transition:max-height .5s ease;}
+.query-card.open .query-body{max-height:20000px;}
+.query-body-inner{padding:.4rem 1.1rem 1.25rem;}
+
+/* Criterion histograms grid */
+.crit-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(440px,1fr));
+           gap:1rem;margin-top:.8rem;}
+.crit-card{border:.5px solid var(--border);border-radius:8px;padding:.8rem .9rem;
+           background:#fafaf7;}
+.crit-name{font-size:12.5px;font-weight:600;color:var(--text);
+           letter-spacing:-.005em;margin-bottom:.5rem;}
+.crit-meta{font-size:10.5px;color:var(--muted);margin-bottom:.6rem;}
+.chart-wrap{position:relative;height:200px;}
+.crit-empty{padding:1rem;text-align:center;font-size:11px;color:var(--muted-2);}
+
+.empty{padding:2.5rem 1rem;text-align:center;font-size:13px;color:var(--muted);}
+</style>
+</head>
+<body>
+
+<div class="meta-stamp">Generated ${new Date().toLocaleString('el-GR')}</div>
+<h1 class="title">CultureBotEval — Criteria Histograms</h1>
+<div class="subtitle">Per-query rating distribution, grouped by LLM</div>
+
+<div id="root"></div>
+
+<script id="report-data" type="application/json">${dataJson}<\/script>
+<script>
+(function(){
+  const DATA       = JSON.parse(document.getElementById('report-data').textContent);
+  const LLM_COLORS = ${colorsJS};
+  const llmColor   = n => LLM_COLORS[n] || '#6b7280';
+
+  function esc(s){
+    return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  const root = document.getElementById('root');
+  const personaNames = Object.keys(DATA.personas).sort();
+
+  if(!personaNames.length){
+    root.innerHTML = '<div class="empty">📭 No evaluations found.</div>';
+    return;
+  }
+
+  const state = { current: personaNames[0] };
+  const chartInstances = []; // track to destroy on re-render
+
+  function render(){
+    // Destroy existing charts
+    while(chartInstances.length){
+      try{ chartInstances.pop().destroy(); }catch(e){}
+    }
+
+    const P = DATA.personas[state.current];
+    const s = DATA.summary;
+
+    root.innerHTML = \`
+      <div class="summary">
+        <span class="summary-chip"><strong>\${s.personas}</strong> personas</span>
+        <span class="summary-chip"><strong>\${s.queries}</strong> queries</span>
+        <span class="summary-chip"><strong>\${s.llms}</strong> LLMs</span>
+        <span class="summary-chip"><strong>\${s.evals}</strong> evaluations</span>
+        <span class="summary-chip"><strong>\${s.evaluators}</strong> unique evaluators</span>
+      </div>
+      <div class="persona-nav-wrap">
+        <button class="nav-arrow left" id="nav-arrow-left" aria-label="Scroll left">‹</button>
+        <div class="persona-nav" id="persona-nav"></div>
+        <button class="nav-arrow right" id="nav-arrow-right" aria-label="Scroll right">›</button>
+      </div>
+      <div id="persona-body"></div>
+    \`;
+
+    const nav = document.getElementById('persona-nav');
+    personaNames.forEach(name=>{
+      const btn = document.createElement('button');
+      btn.className = 'persona-pill' + (name===state.current?' active':'');
+      btn.innerHTML = \`\${esc(name)}<span class="count">\${DATA.personas[name].evalCount}</span>\`;
+      btn.onclick = ()=>{ state.current = name; render(); };
+      nav.appendChild(btn);
+    });
+
+    // Wire up scroll arrows
+    const leftArrow  = document.getElementById('nav-arrow-left');
+    const rightArrow = document.getElementById('nav-arrow-right');
+    const updateArrows = () => {
+      const maxScroll = nav.scrollWidth - nav.clientWidth;
+      leftArrow.disabled  = nav.scrollLeft <= 2;
+      rightArrow.disabled = nav.scrollLeft >= maxScroll - 2;
+      // Hide both arrows if no overflow at all
+      const overflows = nav.scrollWidth > nav.clientWidth + 4;
+      leftArrow.style.display  = overflows ? 'flex' : 'none';
+      rightArrow.style.display = overflows ? 'flex' : 'none';
+    };
+    leftArrow.onclick  = () => nav.scrollBy({left:-220, behavior:'smooth'});
+    rightArrow.onclick = () => nav.scrollBy({left:220, behavior:'smooth'});
+    nav.addEventListener('scroll', updateArrows);
+    // Initial + post-layout checks
+    updateArrows();
+    setTimeout(updateArrows, 50);
+    window.addEventListener('resize', updateArrows);
+
+    // Scroll active pill into view
+    const activeBtn = nav.querySelector('.persona-pill.active');
+    if(activeBtn){
+      const pillOffset = activeBtn.offsetLeft;
+      const pillWidth  = activeBtn.offsetWidth;
+      const navWidth   = nav.clientWidth;
+      if(pillOffset + pillWidth > nav.scrollLeft + navWidth || pillOffset < nav.scrollLeft){
+        nav.scrollTo({left: Math.max(0, pillOffset - navWidth/2 + pillWidth/2), behavior:'smooth'});
+      }
+    }
+
+    renderPersona(P);
+  }
+
+  function renderPersona(P){
+    const body = document.getElementById('persona-body');
+    const qNames = Object.keys(P.queries).sort();
+
+    body.innerHTML = \`
+      <div class="persona-header">
+        <div class="persona-label">Persona</div>
+        <h1 class="persona-title">\${esc(P.title)}</h1>
+        \${P.role ? \`<div class="persona-meta">\${esc(P.role)}</div>\` : ''}
+        \${P.guidelines ? \`<div class="persona-meta" style="margin-top:.5rem;"><strong>Guidelines:</strong> \${esc(P.guidelines)}</div>\` : ''}
+      </div>
+      <div class="section-head">Queries · expand to see per-criterion histograms</div>
+      <div class="query-list" id="query-list"></div>
+    \`;
+
+    const list = document.getElementById('query-list');
+    qNames.forEach((qName, idx)=>{
+      list.appendChild(buildCard(P.queries[qName], idx, P.title));
+    });
+  }
+
+  function buildCard(Q, idx, personaName){
+    const card = document.createElement('div');
+    card.className = 'query-card';
+    const badges = Q.llms.map(l =>
+      \`<span class="llm-badge" style="background:\${llmColor(l)}">\${esc(l)}<span class="llm-badge-count">\${Q.perLlmCount?.[l] ?? 0}</span></span>\`
+    ).join('');
+
+    card.innerHTML = \`
+      <div class="query-head">
+        <svg class="query-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+        <div class="query-title">\${esc(Q.text)}</div>
+        <div class="query-badges">
+          \${badges}
+          <span class="query-evals">\${Q.evalCount} eval\${Q.evalCount===1?'':'s'}</span>
+        </div>
+      </div>
+      <div class="query-body"><div class="query-body-inner"></div></div>
+    \`;
+
+    const head = card.querySelector('.query-head');
+    const inner = card.querySelector('.query-body-inner');
+    let rendered = false;
+
+    head.onclick = ()=>{
+      card.classList.toggle('open');
+      if(!rendered){
+        renderQueryCharts(inner, Q, personaName+'_'+idx);
+        rendered = true;
+      }
+    };
+    if(idx===0) setTimeout(()=>head.click(), 30);
+    return card;
+  }
+
+  function renderQueryCharts(container, Q, prefix){
+    const grid = document.createElement('div');
+    grid.className = 'crit-grid';
+
+    Q.criteria.forEach((crit, cIdx)=>{
+      const card = document.createElement('div');
+      card.className = 'crit-card';
+      const cid = \`chart_\${prefix}_\${cIdx}\`;
+
+      // Check if any LLM has any ratings for this criterion
+      const hasAny = Q.llms.some(l => crit.perLlm[l] && crit.perLlm[l].total>0);
+
+      if(!hasAny){
+        card.innerHTML = \`
+          <div class="crit-name">\${esc(crit.name)}</div>
+          <div class="crit-empty">No ratings for this criterion</div>\`;
+        grid.appendChild(card);
+        return;
+      }
+
+      const totalN = Q.llms.reduce((a,l)=>a+(crit.perLlm[l]?.total||0), 0);
+      card.innerHTML = \`
+        <div class="crit-name">\${esc(crit.name)}</div>
+        <div class="crit-meta">Ratings: \${totalN} · Levels: \${crit.levels.length}</div>
+        <div class="chart-wrap"><canvas id="\${cid}"></canvas></div>\`;
+      grid.appendChild(card);
+
+      // Build datasets: one per LLM
+      const datasets = Q.llms.map(llm=>{
+        const dist = (crit.perLlm[llm]?.counts) || {};
+        return {
+          label: llm,
+          data: crit.levels.map(l => dist[l] || 0),
+          backgroundColor: llmColor(llm),
+          borderColor: llmColor(llm),
+          borderWidth: 0,
+          borderRadius: 4,
+          maxBarThickness: 38
+        };
+      });
+
+      // Render chart after DOM insertion
+      requestAnimationFrame(()=>{
+        const canvas = document.getElementById(cid);
+        if(!canvas) return;
+        const chart = new Chart(canvas, {
+          type:'bar',
+          data:{ labels: crit.levels, datasets },
+          options:{
+            responsive:true, maintainAspectRatio:false,
+            plugins:{
+              legend:{position:'bottom', labels:{font:{size:10},boxWidth:10,padding:8,usePointStyle:true}},
+              tooltip:{
+                callbacks:{
+                  label: ctx => \` \${ctx.dataset.label}: \${ctx.raw} evaluator\${ctx.raw===1?'':'s'}\`
+                }
+              }
+            },
+            scales:{
+              x:{ ticks:{font:{size:10},maxRotation:30,minRotation:0}, grid:{display:false} },
+              y:{ beginAtZero:true, ticks:{stepSize:1,font:{size:10},precision:0},
+                  title:{display:true,text:'# evaluators',font:{size:10}},
+                  grid:{color:'rgba(0,0,0,.05)'} }
+            }
+          }
+        });
+        chartInstances.push(chart);
+      });
+    });
+
+    container.appendChild(grid);
+  }
+
+  render();
+})();
+<\/script>
+</body>
+</html>`;
+}
+
+/* helper */
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+</script>
+</body>
+</html>
