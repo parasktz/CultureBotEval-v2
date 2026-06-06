@@ -49,6 +49,9 @@
 
 .evals-bar{background:var(--bg);border-top:.5px solid var(--border);padding:.55rem 1.25rem;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;}
 .eval-row-item{border-top:.5px solid var(--border);padding:.75rem 1.25rem;display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;}
+.eval-more-btn{flex-shrink:0;align-self:center;}
+.eval-details{padding:0 1.25rem .85rem;border-top:.5px solid var(--border);}
+.eval-details .llm-scores-group:first-child{margin-top:.75rem;}
 .eval-avatar{width:28px;height:28px;border-radius:50%;background:var(--green-bg);color:var(--green-t);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
 .eval-who{font-size:13px;font-weight:500;}
 .eval-when{font-size:11px;color:var(--muted);margin-top:1px;}
@@ -388,18 +391,30 @@ function buildEvalRow(sessionCode, evalKey, ev, llms){
       </div>
     </div>` : '';
 
+  const detailsKey = 'evdet-'+stateKey;
   return `
     <div class="eval-row-item">
       <div class="eval-avatar">${ini(ev.evaluator||'?')}</div>
       <div style="flex:1;min-width:0;">
         <div class="eval-who">${esc(ev.evaluator||'—')}${mineBadge}${editedBadge}</div>
         <div class="eval-when">${esc(ev.timestamp||'')}</div>
-        ${chipsByLlm}
       </div>
-      <div>${editBtn}</div>
+      <button type="button" class="btn sm eval-more-btn" id="${esc(detailsKey)}-btn" onclick="toggleEvalDetails('${esc(detailsKey)}')">more ▾</button>
+    </div>
+    <div class="eval-details" id="${esc(detailsKey)}" style="display:none;">
+      ${chipsByLlm}
+      ${editBtn ? `<div style="margin-top:.5rem;">${editBtn}</div>` : ''}
     </div>
     ${editFormHtml}`;
 }
+
+window.toggleEvalDetails = function(key){
+  const el=$(key); if(!el) return;
+  const btn=$(key+'-btn');
+  const opening = el.style.display==='none';
+  el.style.display = opening ? 'block' : 'none';
+  if(btn) btn.textContent = opening ? 'less ▴' : 'more ▾';
+};
 
 window.toggleDesc = function(cid){
   const short=$(cid+'-short'), full=$(cid+'-full');
