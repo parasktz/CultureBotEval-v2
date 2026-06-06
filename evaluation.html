@@ -24,6 +24,9 @@
   margin-top:.6rem;background:var(--card);border:.5px solid var(--border);
   border-radius:var(--rsm);padding:10px 12px;
 }
+.llm-desc-short,.llm-desc-full{white-space:pre-wrap;word-break:break-word;}
+.desc-more{border:none;background:none;color:var(--blue-t);font-size:12px;font-weight:600;cursor:pointer;padding:0 2px;font-family:inherit;}
+.desc-more:hover{text-decoration:underline;}
 .llm-eval-body{padding:1rem 1.25rem;}
 .llm-count-badge{
   display:inline-block;font-size:12px;background:var(--blue-bg);color:var(--blue-t);
@@ -161,6 +164,14 @@ function setMsg(msg, type='n-err'){
   $('ev-msg').innerHTML = msg ? `<div class="notice ${type}" style="margin-top:.75rem;">${msg}</div>` : '';
 }
 
+window.toggleDesc = function(id){
+  const sh=$(id+'-short'), fu=$(id+'-full');
+  if(!sh||!fu) return;
+  const showFull = fu.style.display==='none';
+  fu.style.display = showFull ? 'block' : 'none';
+  sh.style.display = showFull ? 'none'  : 'block';
+};
+
 auth.onAuthStateChanged(async u => {
   if(!u){ location.href='index.html'; return; }
   const name = u.displayName || u.email;
@@ -227,6 +238,15 @@ function buildLlmEvaluations(){
         <textarea class="fi" rows="2" placeholder="Σχόλια (προαιρετικά)..." data-cm-llm="${li}" data-cm="${c.id}" style="margin-top:5px;"></textarea>
       </div>`).join('');
 
+    const desc   = llm.description || '';
+    const fullD  = esc(desc) || '—';
+    const isLong = desc.length > 160;
+    const shortD = isLong ? esc(desc.slice(0,160))+'…' : fullD;
+    const did    = `lled-${li}`;
+    const moreBtn = isLong
+      ? `<button type="button" class="desc-more" onclick="toggleDesc('${did}')">more ▾</button>`
+      : '';
+
     return `
       <div class="llm-eval-card">
         <div class="llm-eval-head">
@@ -234,7 +254,10 @@ function buildLlmEvaluations(){
             <div class="llm-eval-num">${li+1}</div>
             <div class="llm-eval-title">${esc(llm.title||'—')}</div>
           </div>
-          <div class="llm-eval-desc">${esc(llm.description||'—')}</div>
+          <div class="llm-eval-desc">
+            <div class="llm-desc-short" id="${did}-short">${shortD} ${moreBtn}</div>
+            <div class="llm-desc-full" id="${did}-full" style="display:none;">${fullD} <button type="button" class="desc-more" onclick="toggleDesc('${did}')">less ▴</button></div>
+          </div>
         </div>
         <div class="llm-eval-body">
           <div class="sec-title" style="border:none;padding:0;margin-bottom:.85rem;">Αξιολόγηση — 10 Κριτήρια</div>
