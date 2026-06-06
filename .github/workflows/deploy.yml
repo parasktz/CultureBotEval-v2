@@ -1,0 +1,41 @@
+name: Deploy Static Content to Pages
+
+on:
+  push:
+    branches: ["main"] # Τρέχει αυτόματα όταν κάνετε push στο main branch
+
+  # Επιτρέπει να τρέξετε το deploy και χειροκίνητα μέσα από την καρτέλα Actions
+  workflow_dispatch:
+
+# Ρύθμιση δικαιωμάτων για το GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Αποφυγή ταυτόχρονων εκτελέσεων (κάνει queue αν γίνουν πολλά commits μαζί)
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.' # Δηλώνει ότι η απλή HTML σελίδα βρίσκεται στον κεντρικό φάκελο
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
