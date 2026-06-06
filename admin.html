@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>CultureBotEval-v02 — Admin</title>
+<title>CultureBotEval-v2 — Admin</title>
 <script src="config.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -175,7 +175,7 @@ a.link:hover{text-decoration:underline;}
 <!-- ════ LOGIN ════ -->
 <div id="login-screen">
   <div class="login-box">
-    <h1><a href='https://parasktz.github.io/CultureBotEval-v02'>CultureBotEval-v02</a></h1>
+    <h1><a href='https://parasktz.github.io/CultureBotEval-v2'>CultureBotEval-v2</a></h1>
     <p>Admin Panel · Restricted Access</p>
     <div class="field"><label>Email</label>
       <input type="email" id="l-email" placeholder="admin@example.com"/>
@@ -191,7 +191,7 @@ a.link:hover{text-decoration:underline;}
 <!-- ════ APP ════ -->
 <div id="app">
   <div class="sidebar">
-    <div class="sidebar-logo"><a href='https://parasktz.github.io/CultureBotEval-v02'>CultureBotEval-v02</a></div>
+    <div class="sidebar-logo"><a href='https://parasktz.github.io/CultureBotEval-v2'>CultureBotEval-v2</a></div>
     <div class="sidebar-sub">Admin Panel</div>
     <a class="nav-item active" onclick="showPage('dashboard')">⬛ Dashboard</a>
     <a class="nav-item" onclick="showPage('generate')">⚙ Generate Reports</a>
@@ -320,7 +320,7 @@ a.link:hover{text-decoration:underline;}
         </div>
         <div class="cfg-row">
           <label>GitHub Repo</label>
-          <input id="cfg-repo" value="CultureBotEval-v02"/>
+          <input id="cfg-repo" value="CultureBotEval-v2"/>
         </div>
         <div class="cfg-row">
           <label>Output folder (repo path)</label>
@@ -640,7 +640,7 @@ function loadCfgLocal(){
 }
 function loadCfgFields(){
   document.getElementById('cfg-owner').value  = cfg.owner  || 'parasktz';
-  document.getElementById('cfg-repo').value   = cfg.repo   || 'CultureBotEval-v02';
+  document.getElementById('cfg-repo').value   = cfg.repo   || 'CultureBotEval-v2';
   document.getElementById('cfg-folder').value = cfg.folder || 'reports';
 }
 function saveCfg(){
@@ -735,7 +735,7 @@ async function pushToGitHub(filename, content){
   const token  = getToken();
   if(!token) throw new Error('GitHub token not set.');
   const owner  = cfg.owner  || 'parasktz';
-  const repo   = cfg.repo   || 'CultureBotEval-v02';
+  const repo   = cfg.repo   || 'CultureBotEval-v2';
   const folder = cfg.folder || 'reports';
   const path   = `${folder}/${filename}`;
   const url    = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
@@ -773,7 +773,7 @@ async function pushToGitHub(filename, content){
 ═══════════════════════════════════════════════ */
 async function saveReportRecord(filename, type, data){
   const owner  = cfg.owner  || 'parasktz';
-  const repo   = cfg.repo   || 'CultureBotEval-v02';
+  const repo   = cfg.repo   || 'CultureBotEval-v2';
   const folder = cfg.folder || 'reports';
   const ghUrl  = `https://github.com/${owner}/${repo}/blob/main/${folder}/${filename}`;
   const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main/${folder}/${filename}`;
@@ -837,7 +837,7 @@ async function saveReportRecord(filename, type, data){
 
 async function updateLatestPointer(f1, f2){
   const owner  = cfg.owner  || 'parasktz';
-  const repo   = cfg.repo   || 'CultureBotEval-v02';
+  const repo   = cfg.repo   || 'CultureBotEval-v2';
   const folder = cfg.folder || 'reports';
   // Use raw.githubusercontent.com — propagates instantly, no GitHub Pages required
   await db.ref('latestReports').update({
@@ -849,7 +849,7 @@ async function updateLatestPointer(f1, f2){
 
 async function updateLatestPointerSingle(filename, type){
   const owner  = cfg.owner  || 'parasktz';
-  const repo   = cfg.repo   || 'CultureBotEval-v02';
+  const repo   = cfg.repo   || 'CultureBotEval-v2';
   const folder = cfg.folder || 'reports';
   const url    = `https://raw.githubusercontent.com/${owner}/${repo}/main/${folder}/${filename}`;
   await db.ref('latestReports').update({
@@ -1073,7 +1073,7 @@ function buildFile1(data){
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>CultureBotEval-v02 — Statistics</title>
+<title>CultureBotEval-v2 — Statistics</title>
 <style>
 :root{--bg:#f4f3ee;--card:#fff;--border:rgba(0,0,0,.09);--text:#18180f;--muted:#68685f;
   --blue:#2b7fd4;--blue-bg:#e8f2fc;--blue-t:#0a3d6e;--green-bg:#e0f4ec;--green-t:#074d35;--r:10px;}
@@ -1121,7 +1121,7 @@ h1{font-size:22px;font-weight:500;margin-bottom:.3rem;}
 </head>
 <body>
 <div class="wrap">
-<h1>CultureBotEval-v02 — Session Statistics</h1>
+<h1>CultureBotEval-v2 — Session Statistics</h1>
 <div class="subtitle">${allKeys.length} sessions · ${llmList.length} LLMs · ${new Date().toLocaleDateString('el-GR')}</div>
 <div class="summary">
   <div class="stat"><div class="stat-lbl">Sessions</div><div class="stat-val">${allKeys.length}</div></div>
@@ -1289,7 +1289,7 @@ function buildFile2(data){
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Criteria Histograms — CultureBotEval-v02</title>
+<title>Criteria Histograms — CultureBotEval-v2</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"><\/script>
 <style>
 :root{
@@ -1395,7 +1395,7 @@ h1.title{font-size:22px;font-weight:500;margin-bottom:.3rem;}
 <body>
 
 <div class="meta-stamp">Generated ${new Date().toLocaleString('el-GR')}</div>
-<h1 class="title">CultureBotEval-v02 — Criteria Histograms</h1>
+<h1 class="title">CultureBotEval-v2 — Criteria Histograms</h1>
 <div class="subtitle">Per-query rating distribution, grouped by LLM</div>
 
 <div id="root"></div>
