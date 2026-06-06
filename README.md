@@ -32,7 +32,9 @@ index.html  →  role.html  →  evaluator.html         →     evaluationlist2p
 | 9 | Completeness / Variety / Representative | Excellent · Good · Fair · Poor |
 | 10 | Needed Logical Steps | All · Mostly · Partially · Missing |
 
----
+
+## Δομή
+```
 CultureBotEval/
 ├── index.html                      # Login 
 ├── role.html                       # Αρχική με tabs: Create · Modify · Evaluation · Statistics · Admin 
@@ -49,6 +51,25 @@ CultureBotEval/
 ├── config.js                       # Firebase config 
 ├── reports/                        # Παράγονται από το admin (Generate & Push Both)
 └── .github/workflows/deploy.yml    # GitHub Pages auto-deploy 
+```
+
+## data model (σύνοψη)
+
+```jsonc
+sessions/{CODE} = {
+  creator, creatorUid, creatorEmail, personaTitle, personaRole,
+  guidelines, query, createdAt, updatedAt,
+  llmCount: N,
+  llms: [ {title, description}, … ],
+  evaluations: {
+    {key}: {
+      evaluator, evaluatorEmail, evaluatorUid, timestamp, lastEdited,
+      llms: { 0:{llmTitle,ratings:{1..10},comments:{1..10}}, 1:{…} }
+    }
+  }
+}
+```
+
 
 ## Firebase Data Structure:
 
