@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>CultureBotEval — Statistics</title>
+<style>
+:root{--bg:#f4f3ee;--card:#fff;--border:rgba(0,0,0,.09);--text:#18180f;--muted:#68685f;
+  --blue:#2b7fd4;--blue-bg:#e8f2fc;--blue-t:#0a3d6e;--green-bg:#e0f4ec;--green-t:#074d35;--r:10px;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);padding:2rem 1.25rem 4rem;}
+.wrap{max-width:980px;margin:0 auto;}
+h1{font-size:22px;font-weight:500;margin-bottom:.3rem;}
+.subtitle{font-size:13px;color:var(--muted);margin-bottom:2rem;}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:2rem;}
+.stat{background:var(--card);border:.5px solid var(--border);border-radius:var(--r);padding:.9rem 1.1rem;}
+.stat-lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;}
+.stat-val{font-size:26px;font-weight:500;color:var(--blue-t);}
+.role-block{background:var(--card);border:.5px solid var(--border);border-radius:var(--r);margin-bottom:1.25rem;overflow:hidden;}
+.role-head{padding:.85rem 1.25rem;background:var(--blue-bg);border-bottom:.5px solid rgba(43,127,212,.18);
+           display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+.role-text{font-size:14px;font-weight:600;color:var(--blue-t);line-height:1.5;}
+.badges{display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;margin-top:2px;}
+.badge{font-size:11px;border-radius:4px;padding:2px 8px;font-weight:500;white-space:nowrap;}
+.b-blue{background:var(--blue-bg);color:var(--blue-t);border:.5px solid rgba(43,127,212,.2);}
+.b-green{background:var(--green-bg);color:var(--green-t);}
+.b-amber{background:#fff4e0;color:#8a4a00;border:.5px solid rgba(138,74,0,.18);}
+.b-purple{background:#ede7f6;color:#4527a0;border:.5px solid rgba(69,39,160,.18);}
+.q-list{padding:.4rem 0;}
+.q-row{padding:.65rem 1.25rem;border-bottom:.5px solid var(--border);display:flex;align-items:flex-start;gap:10px;}
+.q-row:last-child{border-bottom:none;}
+.q-idx{min-width:22px;height:22px;border-radius:50%;background:var(--bg);color:var(--muted);
+       font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;}
+.q-body{flex:1;min-width:0;}
+.q-text{font-size:13px;color:var(--text);line-height:1.6;margin-bottom:6px;word-break:break-word;white-space:pre-wrap;}
+.llms{display:flex;flex-wrap:wrap;gap:4px;}
+.llm{font-size:11px;border-radius:4px;padding:2px 9px;border:.5px solid var(--border);color:var(--muted);background:var(--bg);
+     display:inline-flex;align-items:center;gap:5px;}
+.llm-chip-count{background:rgba(0,0,0,.15);padding:0 6px;border-radius:999px;
+                font-size:10px;font-weight:700;min-width:14px;text-align:center;line-height:1.5;}
+.llm-chip-count.zero{background:rgba(0,0,0,.06);color:rgba(0,0,0,.35);font-weight:500;}
+.llm.chatgpt{background:#fff3e0;color:#7a3c00;border-color:rgba(122,60,0,.15);}
+.llm.gemini {background:#e8f5e9;color:#1b5e20;border-color:rgba(27,94,32,.15);}
+.llm.scb1   {background:var(--blue-bg);color:var(--blue-t);border-color:rgba(43,127,212,.15);}
+.llm.scb2   {background:#ede7f6;color:#4527a0;border-color:rgba(69,39,160,.15);}
+.llm.scb3   {background:#fce4ec;color:#880e4f;border-color:rgba(136,14,79,.15);}
+.legend{margin-top:1.5rem;display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+.leg-lbl{font-size:12px;color:var(--muted);margin-right:4px;}
+.gen-info{font-size:11px;color:var(--muted);margin-top:2rem;padding-top:1rem;border-top:.5px solid var(--border);font-family:monospace;}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>CultureBotEval — Session Statistics</h1>
+<div class="subtitle">59 sessions · 11 LLMs · 6/6/2026</div>
+<div class="summary">
+  <div class="stat"><div class="stat-lbl">Sessions</div><div class="stat-val">59</div></div>
+  <div class="stat"><div class="stat-lbl">Persona Groups</div><div class="stat-val">15</div></div>
+  <div class="stat"><div class="stat-lbl">Unique Queries</div><div class="stat-val">59</div></div>
+  <div class="stat"><div class="stat-lbl">LLMs</div><div class="stat-val">11</div></div>
+  <div class="stat"><div class="stat-lbl">Evaluations</div><div class="stat-val">26</div></div>
+  <div class="stat"><div class="stat-lbl">Unique Evaluators</div><div class="stat-val">5</div></div>
+</div>
+
+    <div class="role-block">
+      <div class="role-head">
+        <div class="role-text">Middle school educator</div>
+        <div class="badges">
+          <span class="badge b-blue">10 queries</span>
+          <span class="badge b-green">20 sessions</span>
+          <span class="badge b-amber">19 evaluations</span>
+          <span class="badge b-purple">1 unique evaluator</span>
+        </div>
+      </div>
+      <div class="q-list">
+      <div class="q-row">
+        <div class="q-idx">1</div>
+        <div class="q-body">
+          <div class="q-text">Give me examples of religious rituals that are dipicted in ancient greek vessels</div>
+          <div class="llms"><span class="llm scb1" title="1 evaluator across 1 session">SearchCultureBot v1<span class="llm-chip-count">1</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">2</div>
+        <div class="q-body">
+          <div class="q-text">Can you give me examples of objects that illustrate how young Athenians were educated.</div>
+          <div class="llms"><span class="llm chatgpt" title="1 evaluator across 1 session">ChatGPT<span class="llm-chip-count">1</span></span><span class="llm scb1" title="1 evaluator across 1 session">SearchCultureBot v1<span class="llm-chip-count">1</span></span><span class="llm gemini" title="1 evaluator across 1 session">Gemini<span class="llm-chip-count">1</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">3</div>
+        <div class="q-body">
+          <div class="q-text">Give me examples of artifacts depicting Everyday Life in Classical-period Athens (5th–4th century BCE)</div>
+          <div class="llms"><span class="llm chatgpt" title="1 evaluator across 1 session">ChatGPT<span class="llm-chip-count">1</span></span><span class="llm gemini" title="1 evaluator across 1 session">Gemini<span class="llm-chip-count">1</span></span><span class="llm scb1" title="1 evaluator across 1 session">SearchCultureBot v1<span class="llm-chip-count">1</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">4</div>
+        <div class="q-body">
+          <div class="q-text">Give me pictures of Children's Toys in Classical-period Athens (5th–4th century BCE)</div>
+          <div class="llms"><span class="llm scb1" title="1 evaluator across 1 session">SearchCultureBot v1<span class="llm-chip-count">1</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">5</div>
+        <div class="q-body">
+          <div class="q-text">Give me a list of the most common musical instruments in ancient greece</div>
+          <div class="llms"><span class="llm chatgpt" title="1 evaluator across 1 session">ChatGPT<span class="llm-chip-count">1</span></span><span class="llm gemini" title="1 evaluator across 1 session">Gemini<span class="llm-chip-count">1</span></span><span class="llm scb1" title="1 evaluator across 1 session">SearchCultureBot v1<span class="llm-chip-count">1</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">6</div>
+        <div class="q-body">
+          <div class="q-text">Can you give me examples of Marble sculptures depicting mythological creatures from ancient Greece?</div>
+          <div class="llms"><span class="llm chatgpt" title="1 evaluator across 1 session">ChatGPT<span class="llm-chip-count">1</span></span><span class="llm scb1" title="1 evaluator across 1 session">SearchCultureBot v1<span class="llm-chip-count">1</span></span><span class="llm gemini" title="1 evaluator across 1 session">Gemini<span class="llm-chip-count">1</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">7</div>
+        <div class="q-body">
+          <div class="q-text">I'm looking for athletic depictions in pottery and examples of athletic equipment from Classical Athens (5th–4th century BCE)</div>
+          <div class="llms"><span class="llm scb1" title="1 evaluator across 1 session">SearchCultureBot v1<span class="llm-chip-count">1</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">8</div>
+        <div class="q-body">
+          <div class="q-text">Can you give me examples of objects that are related to democratic prosesses in Ancient Athens during Archaic and Classical period</div>
+          <div class="llms"><span class="llm chatgpt" title="1 evaluator across 1 session">ChatGPT<span class="llm-chip-count">1</span></span><span class="llm gemini" title="1 evaluator across 1 session">Gemini<span class="llm-chip-count">1</span></span><span class="llm scb1" title="1 evaluator across 1 session">SearchCultureBot v1<span class="llm-chip-count">1</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">9</div>
+        <div class="q-body">
+          <div class="q-text">Tell me which jewels were more common in Ancient Athens during the Classical period (5th–4th century BCE)</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">10</div>
+        <div class="q-body">
+          <div class="q-text">Tell me which jewells were more common in Ancient Athens during the Classical period (5th–4th century BCE)</div>
+          <div class="llms"><span class="llm scb1" title="1 evaluator across 1 session">SearchCultureBot v1<span class="llm-chip-count">1</span></span></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="role-block">
+      <div class="role-head">
+        <div class="role-text">Archeology Student</div>
+        <div class="badges">
+          <span class="badge b-blue">7 queries</span>
+          <span class="badge b-green">7 sessions</span>
+          <span class="badge b-amber">1 evaluation</span>
+          <span class="badge b-purple">1 unique evaluator</span>
+        </div>
+      </div>
+      <div class="q-list">
+      <div class="q-row">
+        <div class="q-idx">1</div>
+        <div class="q-body">
+          <div class="q-text">I want to see pictures of Roman copies of ancient Greek statues from Greece.</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">2</div>
+        <div class="q-body">
+          <div class="q-text">I want to see images of late Byzantine miniature art</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">3</div>
+        <div class="q-body">
+          <div class="q-text">I want to see pictures of geometric  loutrophoroi</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">4</div>
+        <div class="q-body">
+          <div class="q-text">I want to see pictures of Neolithic figurines from Greece.</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">5</div>
+        <div class="q-body">
+          <div class="q-text">I want to see pictures of Mycenaean pottery from Crete.</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">6</div>
+        <div class="q-body">
+          <div class="q-text">I want to see pictures of busts of Roman emperors found in Greece.</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">7</div>
+        <div class="q-body">
+          <div class="q-text">I want to see depictions of the Crucifixion from the post-Byzantine period.</div>
+          <div class="llms"><span class="llm chatgpt" title="1 evaluator across 1 session">ChatGPT<span class="llm-chip-count">1</span></span></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="role-block">
+      <div class="role-head">
+        <div class="role-text">Craftsperson responsible for developing new products for a museum retail shop</div>
+        <div class="badges">
+          <span class="badge b-blue">5 queries</span>
+          <span class="badge b-green">5 sessions</span>
+          <span class="badge b-amber">1 evaluation</span>
+          <span class="badge b-purple">1 unique evaluator</span>
+        </div>
+      </div>
+      <div class="q-list">
+      <div class="q-row">
+        <div class="q-idx">1</div>
+        <div class="q-body">
+          <div class="q-text">I am interested in objects from Hellenic cultural heritage with rich textures or relief decoration that could inspire embossed leather goods or tactile packaging design.</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">2</div>
+        <div class="q-body">
+          <div class="q-text">Find aesthetically compelling Greek artefacts that carry a clear narrative scene. I want to explore storytelling through illustrated contemporary crafts.</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">3</div>
+        <div class="q-body">
+          <div class="q-text">I am designing a series of ceramic vessels inspired by Greek historical artefacts. Can you find museum objects with striking silhouettes or sculptural profiles that could be translated into contemporary tableware?/ Σχεδιάζω μια σειρά από κεραμικά σκεύη εμπνευσμένα από ελληνικά ιστορικά τεχνουργήματα. Μπορείτε να βρείτε μουσειακά αντικείμενα με ιδιαίτερες σιλουέτες ή γλυπτικά προφίλ που θα μπορούσαν να μεταφερθούν σε σύγχρονα επιτραπέζια σκεύη;</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">4</div>
+        <div class="q-body">
+          <div class="q-text">Retrieve Greek artefacts defined by strong geometric structures that could inspire parametric or digitally fabricated craft objects.</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">5</div>
+        <div class="q-body">
+          <div class="q-text">Can you retrieve Greek cultural heritage objects with distinctive and harmonious colour palettes that could guide a new line of scarves or stationery?/ Βρες μου ελληνικά αντικείμενα πολιτιστικής κληρονομιάς με ιδιαίτερες ή αρμονικές χρωματικές παλέτες, που θα μπορούσαν να αποτελέσουν έμπνευση για μια νέα σειρά από αξεσουάρ, όπως μαντίλια ή είδη γραφικής ύλης;</div>
+          <div class="llms"><span class="llm scb1" title="1 evaluator across 1 session">SearchCultureBot v1<span class="llm-chip-count">1</span></span></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="role-block">
+      <div class="role-head">
+        <div class="role-text">Professional tour guide/tour organizer</div>
+        <div class="badges">
+          <span class="badge b-blue">6 queries</span>
+          <span class="badge b-green">8 sessions</span>
+          <span class="badge b-amber">3 evaluations</span>
+          <span class="badge b-purple">1 unique evaluator</span>
+        </div>
+      </div>
+      <div class="q-list">
+      <div class="q-row">
+        <div class="q-idx">1</div>
+        <div class="q-body">
+          <div class="q-text">I want to organize a trip that includes visits to churches in the prefecture of Ioannina. Make me a list of the most important ones and show me photos of artifacts found in them.</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">2</div>
+        <div class="q-body">
+          <div class="q-text">What are the most important archaeological sites in Eastern Attica? Show me finds from these sites that are on display at the National Archaeological Museum of Athens.</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">3</div>
+        <div class="q-body">
+          <div class="q-text">I want to see othoman objects found in Athens City Centre</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">4</div>
+        <div class="q-body">
+          <div class="q-text">What are the most important archaeological sites in Thesprotia? Show me photos of finds from this area.</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">5</div>
+        <div class="q-body">
+          <div class="q-text">From which archaeological sites do the finds exhibited in the Archaeological Museum of Thessaloniki originate? I would also like to see some representative photographs (one object for each archaeological site).</div>
+          <div class="llms"><span class="llm chatgpt" title="1 evaluator across 1 session">ChatGPT<span class="llm-chip-count">1</span></span><span class="llm gemini" title="1 evaluator across 1 session">Gemini<span class="llm-chip-count">1</span></span><span class="llm scb1" title="1 evaluator across 1 session">SearchCultureBot v1<span class="llm-chip-count">1</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">6</div>
+        <div class="q-body">
+          <div class="q-text">I want to see pictures of Roman statues found in the center of Athens, as well as the locations where they were found.</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="role-block">
+      <div class="role-head">
+        <div class="role-text">Archaeology student</div>
+        <div class="badges">
+          <span class="badge b-blue">3 queries</span>
+          <span class="badge b-green">3 sessions</span>
+          <span class="badge b-amber">0 evaluations</span>
+          <span class="badge b-purple">0 unique evaluators</span>
+        </div>
+      </div>
+      <div class="q-list">
+      <div class="q-row">
+        <div class="q-idx">1</div>
+        <div class="q-body">
+          <div class="q-text">Give me a list of burial sites in Greece (current entity) in which obsidian tools have been found</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">2</div>
+        <div class="q-body">
+          <div class="q-text">Can you give me examples of obsidian objects?</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">3</div>
+        <div class="q-body">
+          <div class="q-text">Now narrow down the list to the sites where black obsidian has been found</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="role-block">
+      <div class="role-head">
+        <div class="role-text">Contemporary visual artist</div>
+        <div class="badges">
+          <span class="badge b-blue">3 queries</span>
+          <span class="badge b-green">3 sessions</span>
+          <span class="badge b-amber">0 evaluations</span>
+          <span class="badge b-purple">0 unique evaluators</span>
+        </div>
+      </div>
+      <div class="q-list">
+      <div class="q-row">
+        <div class="q-idx">1</div>
+        <div class="q-body">
+          <div class="q-text">What can you tell me about the iconography of icons depicting female saints in orthodox tradition?/ Τι μπορείς να μου πεις για την εικονογραφία των εικόνων που απεικονίζουν γυναίκες αγίες στην ορθόδοξη παράδοση;</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">2</div>
+        <div class="q-body">
+          <div class="q-text">What is the ratio between male and female saints' icon production in the Byzantine and post-Byzantine era?</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">3</div>
+        <div class="q-body">
+          <div class="q-text">What key typologies can be found in the representations of Virgin Mary in Byzantine icons?/ Ποιοι είναι οι κύριοι εικονογραφικοί τύποι που συναντώνται στις αναπαραστάσεις της Παναγίας στις βυζαντινές εικόνες;</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="role-block">
+      <div class="role-head">
+        <div class="role-text">Turkish Scholar of folklore and ethnology</div>
+        <div class="badges">
+          <span class="badge b-blue">2 queries</span>
+          <span class="badge b-green">2 sessions</span>
+          <span class="badge b-amber">0 evaluations</span>
+          <span class="badge b-purple">0 unique evaluators</span>
+        </div>
+      </div>
+      <div class="q-list">
+      <div class="q-row">
+        <div class="q-idx">1</div>
+        <div class="q-body">
+          <div class="q-text">Which of these figures are Ottoman/Turkish and how are they represented?</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">2</div>
+        <div class="q-body">
+          <div class="q-text">Can you give me a list of shadow theater figures representing social identities?</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="role-block">
+      <div class="role-head">
+        <div class="role-text">Student - High school</div>
+        <div class="badges">
+          <span class="badge b-blue">12 queries</span>
+          <span class="badge b-green">21 sessions</span>
+          <span class="badge b-amber">21 evaluations</span>
+          <span class="badge b-purple">3 unique evaluators</span>
+        </div>
+      </div>
+      <div class="q-list">
+      <div class="q-row">
+        <div class="q-idx">1</div>
+        <div class="q-body">
+          <div class="q-text">In class, we saw the crater of Derveni. What other findings come from this archaeological site? I want you to show me photos of them.</div>
+          <div class="llms"><span class="llm chatgpt" title="1 evaluator across 1 session">ChatGPT<span class="llm-chip-count">1</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">2</div>
+        <div class="q-body">
+          <div class="q-text">I want you to find me depictions of the god Apollo.</div>
+          <div class="llms"><span class="llm chatgpt" title="1 evaluator across 1 session">ChatGPT<span class="llm-chip-count">1</span></span><span class="llm gemini" title="1 evaluator across 1 session">Gemini<span class="llm-chip-count">1</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">3</div>
+        <div class="q-body">
+          <div class="q-text">I am doing a project on the 1821 revolution and I want you to tell me what weapons the combatants used. I also want you to show me what these weapons looked like.</div>
+          <div class="llms"><span class="llm gemini" title="3 evaluators across 1 session">Gemini<span class="llm-chip-count">3</span></span><span class="llm chatgpt" title="2 evaluators across 1 session">ChatGPT<span class="llm-chip-count">2</span></span><span class="llm scb1" title="2 evaluators across 1 session">SearchCultureBot v1<span class="llm-chip-count">2</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">4</div>
+        <div class="q-body">
+          <div class="q-text">I am doing a school project and want to know what images are depicted on ancient coins.</div>
+          <div class="llms"><span class="llm chatgpt" title="1 evaluator across 1 session">ChatGPT<span class="llm-chip-count">1</span></span><span class="llm gemini" title="1 evaluator across 1 session">Gemini<span class="llm-chip-count">1</span></span><span class="llm scb1" title="1 evaluator across 1 session">SearchCultureBot v1<span class="llm-chip-count">1</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">5</div>
+        <div class="q-body">
+          <div class="q-text">I want images - examples that show how the naked male body is depicted in Greek art from the Geometric period to the present day.</div>
+          <div class="llms"><span class="llm gemini" title="1 evaluator across 1 session">Gemini<span class="llm-chip-count">1</span></span><span class="llm scb1" title="1 evaluator across 1 session">SearchCultureBot v1<span class="llm-chip-count">1</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">6</div>
+        <div class="q-body">
+          <div class="q-text">What games did the children play in Ancient Greece? Are there any archaeological finds? Can you show me some?</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">7</div>
+        <div class="q-body">
+          <div class="q-text">We went on a school trip to Vergina and saw a golden wreath. Have golden wreaths been found elsewhere in Greece? Can you show me some?</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">8</div>
+        <div class="q-body">
+          <div class="q-text">What specific garments make up the vestments of the Eastern Orthodox Church? Show me pictures - examples of each.</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">9</div>
+        <div class="q-body">
+          <div class="q-text">What are the most popular types of ancient Greek vases? Give me an illustrative photo for each of them.</div>
+          <div class="llms"><span class="llm gemini" title="1 evaluator across 1 session">Gemini<span class="llm-chip-count">1</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">10</div>
+        <div class="q-body">
+          <div class="q-text">I am doing a school project and would like to know what images are depicted on ancient coins from the Greek colonies in southern Italy.</div>
+          <div class="llms"><span class="llm chatgpt" title="1 evaluator across 1 session">ChatGPT<span class="llm-chip-count">1</span></span><span class="llm scb1" title="1 evaluator across 1 session">SearchCultureBot v1<span class="llm-chip-count">1</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">11</div>
+        <div class="q-body">
+          <div class="q-text">I want you to show me archaeological objects depicting scenes from Homer's epics.</div>
+          <div class="llms"><span class="llm chatgpt" title="1 evaluator across 1 session">ChatGPT<span class="llm-chip-count">1</span></span><span class="llm gemini" title="1 evaluator across 1 session">Gemini<span class="llm-chip-count">1</span></span><span class="llm scb1" title="1 evaluator across 1 session">SearchCultureBot v1<span class="llm-chip-count">1</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">12</div>
+        <div class="q-body">
+          <div class="q-text">Show me pictures - examples of ancient Greek medical tools</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="role-block">
+      <div class="role-head">
+        <div class="role-text">Journalist responsible for cultural podcasts for this newspaper</div>
+        <div class="badges">
+          <span class="badge b-blue">4 queries</span>
+          <span class="badge b-green">4 sessions</span>
+          <span class="badge b-amber">0 evaluations</span>
+          <span class="badge b-purple">0 unique evaluators</span>
+        </div>
+      </div>
+      <div class="q-list">
+      <div class="q-row">
+        <div class="q-idx">1</div>
+        <div class="q-body">
+          <div class="q-text">Θέλω να βρω οπλισμό που χρησιμοποιούσαν οι Αγωνιστές το 1821</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">2</div>
+        <div class="q-body">
+          <div class="q-text">Which Greek artefacts have a sound-related story —such as bells, instruments, textiles, or materials with unique acoustics/ Ποια ελληνικά τεχνουργήματα έχουν μια ιστορία που σχετίζεται με τον ήχο —όπως κουδούνια, όργανα, υφάσματα ή υλικά με μοναδική ακουστική;</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">3</div>
+        <div class="q-body">
+          <div class="q-text">Select three CHOs that could form the backbone of a sound-rich storytelling piece about 20th century in Greece?</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">4</div>
+        <div class="q-body">
+          <div class="q-text">Can you give me a list of objects from ancient Greek culture which best illustrate the tension between function and ornament?</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="role-block">
+      <div class="role-head">
+        <div class="role-text">Creative professional-Book Arts craftsman</div>
+        <div class="badges">
+          <span class="badge b-blue">1 query</span>
+          <span class="badge b-green">1 session</span>
+          <span class="badge b-amber">0 evaluations</span>
+          <span class="badge b-purple">0 unique evaluators</span>
+        </div>
+      </div>
+      <div class="q-list">
+      <div class="q-row">
+        <div class="q-idx">1</div>
+        <div class="q-body">
+          <div class="q-text">Can you give me examples of Byzantine bookbinding of varying sewing structures and materials?</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="role-block">
+      <div class="role-head">
+        <div class="role-text">Σ</div>
+        <div class="badges">
+          <span class="badge b-blue">1 query</span>
+          <span class="badge b-green">4 sessions</span>
+          <span class="badge b-amber">4 evaluations</span>
+          <span class="badge b-purple">1 unique evaluator</span>
+        </div>
+      </div>
+      <div class="q-list">
+      <div class="q-row">
+        <div class="q-idx">1</div>
+        <div class="q-body">
+          <div class="q-text">SS</div>
+          <div class="llms"><span class="llm " title="1 evaluator across 1 session">S<span class="llm-chip-count">1</span></span><span class="llm " title="1 evaluator across 1 session">SS<span class="llm-chip-count">1</span></span><span class="llm " title="1 evaluator across 1 session">SSS<span class="llm-chip-count">1</span></span><span class="llm " title="1 evaluator across 1 session">SSSS<span class="llm-chip-count">1</span></span></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="role-block">
+      <div class="role-head">
+        <div class="role-text">Museum curator</div>
+        <div class="badges">
+          <span class="badge b-blue">1 query</span>
+          <span class="badge b-green">1 session</span>
+          <span class="badge b-amber">0 evaluations</span>
+          <span class="badge b-purple">0 unique evaluators</span>
+        </div>
+      </div>
+      <div class="q-list">
+      <div class="q-row">
+        <div class="q-idx">1</div>
+        <div class="q-body">
+          <div class="q-text">Can you summarize the typology of ancient Greek pottery for a varied audience, including children and families/ Μπορείτε να συνοψίσετε την τυπολογία των αρχαίων ελληνικών αγγείων για ένα ευρύ κοινό, συμπεριλαμβανομένων παιδιών και οικογενειών;</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="role-block">
+      <div class="role-head">
+        <div class="role-text">Ethics and repatriation Officer, EU</div>
+        <div class="badges">
+          <span class="badge b-blue">2 queries</span>
+          <span class="badge b-green">2 sessions</span>
+          <span class="badge b-amber">1 evaluation</span>
+          <span class="badge b-purple">1 unique evaluator</span>
+        </div>
+      </div>
+      <div class="q-list">
+      <div class="q-row">
+        <div class="q-idx">1</div>
+        <div class="q-body">
+          <div class="q-text">What about human remains held in monasteries and churches for worship?</div>
+          <div class="llms"><span class="llm " title="0 evaluators across 1 session">Unknown<span class="llm-chip-count zero">0</span></span></div>
+        </div>
+      </div>
+      <div class="q-row">
+        <div class="q-idx">2</div>
+        <div class="q-body">
+          <div class="q-text">Can you give me a map or list of places that human remains are stored or displayed in Greece?</div>
+          <div class="llms"><span class="llm gemini" title="1 evaluator across 1 session">Gemini<span class="llm-chip-count">1</span></span></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="role-block">
+      <div class="role-head">
+        <div class="role-text">sa</div>
+        <div class="badges">
+          <span class="badge b-blue">1 query</span>
+          <span class="badge b-green">3 sessions</span>
+          <span class="badge b-amber">3 evaluations</span>
+          <span class="badge b-purple">1 unique evaluator</span>
+        </div>
+      </div>
+      <div class="q-list">
+      <div class="q-row">
+        <div class="q-idx">1</div>
+        <div class="q-body">
+          <div class="q-text">sa</div>
+          <div class="llms"><span class="llm " title="1 evaluator across 1 session">sa<span class="llm-chip-count">1</span></span><span class="llm " title="1 evaluator across 1 session">sasa<span class="llm-chip-count">1</span></span><span class="llm " title="1 evaluator across 1 session">assasa<span class="llm-chip-count">1</span></span></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="role-block">
+      <div class="role-head">
+        <div class="role-text">wq</div>
+        <div class="badges">
+          <span class="badge b-blue">1 query</span>
+          <span class="badge b-green">1 session</span>
+          <span class="badge b-amber">1 evaluation</span>
+          <span class="badge b-purple">1 unique evaluator</span>
+        </div>
+      </div>
+      <div class="q-list">
+      <div class="q-row">
+        <div class="q-idx">1</div>
+        <div class="q-body">
+          <div class="q-text">wqwq</div>
+          <div class="llms"><span class="llm " title="1 evaluator across 1 session">wqwq<span class="llm-chip-count">1</span></span></div>
+        </div>
+      </div></div>
+    </div>
+<div class="legend"><span class="leg-lbl">LLMs:</span><span class="llm chatgpt" style="padding:3px 10px;font-size:12px;">ChatGPT</span><span class="llm gemini" style="padding:3px 10px;font-size:12px;">Gemini</span><span class="llm scb1" style="padding:3px 10px;font-size:12px;">SearchCultureBot v1</span><span class="llm scb2" style="padding:3px 10px;font-size:12px;">SearchCultureBot v2</span><span class="llm scb3" style="padding:3px 10px;font-size:12px;">SearchCultureBot v3</span></div>
+<div class="gen-info">Generated: 2026-06-06T16:11:19.984Z · CultureBotEval Admin</div>
+</div>
+<script>function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}</script>
+</body></html>
