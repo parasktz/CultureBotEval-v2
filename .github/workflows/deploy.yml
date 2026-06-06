@@ -1,41 +1,20 @@
-name: Deploy Static Content to Pages
-
+name: Deploy to Firebase Hosting
 on:
   push:
-    branches: ["main"] # Τρέχει αυτόματα όταν κάνετε push στο main branch
-
-  # Επιτρέπει να τρέξετε το deploy και χειροκίνητα μέσα από την καρτέλα Actions
-  workflow_dispatch:
-
-# Ρύθμιση δικαιωμάτων για το GitHub Pages
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-# Αποφυγή ταυτόχρονων εκτελέσεων (κάνει queue αν γίνουν πολλά commits μαζί)
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
+    branches:
+      - main # Ή το όνομα του δικού σας κεντρικού branch (π.χ. master)
 
 jobs:
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout Repo
         uses: actions/checkout@v4
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload Artifact
-        uses: actions/upload-pages-artifact@v3
+      
+      - name: Deploy to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
         with:
-          path: '.' # Δηλώνει ότι η απλή HTML σελίδα βρίσκεται στον κεντρικό φάκελο
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
+          projectId: cultureboteval-v2-18d9e
+          channelId: live
