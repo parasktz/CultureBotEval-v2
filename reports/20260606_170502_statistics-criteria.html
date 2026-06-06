@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Criteria Histograms — CultureBotEval</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#f4f3ee; --card:#fff; --border:rgba(0,0,0,.09);
+  --text:#18180f; --muted:#68685f; --muted-2:#a8a89e;
+  --blue-t:#0a3d6e;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+     background:var(--bg);color:var(--text);padding:1.5rem 1.5rem 3rem;
+     max-width:1200px;margin:0 auto;}
+
+.meta-stamp{font-size:10.5px;color:var(--muted-2);text-align:right;margin-bottom:.5rem;}
+h1.title{font-size:22px;font-weight:500;margin-bottom:.3rem;}
+.subtitle{font-size:13px;color:var(--muted);margin-bottom:.8rem;}
+
+/* Summary chips */
+.summary{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.2rem;}
+.summary-chip{background:var(--card);border:.5px solid var(--border);border-radius:999px;
+              padding:.35rem .9rem;font-size:11.5px;color:var(--muted);
+              display:inline-flex;align-items:center;gap:6px;}
+.summary-chip strong{color:var(--text);font-weight:600;}
+
+/* Persona pills */
+/* Persona nav wrapper with scroll arrows */
+.persona-nav-wrap{position:relative;margin-bottom:1.5rem;border-bottom:.5px solid var(--border);padding-bottom:.5rem;}
+.persona-nav{display:flex;gap:.4rem;overflow-x:auto;scrollbar-width:none;scroll-behavior:smooth;
+             padding:0 38px;}
+.persona-nav::-webkit-scrollbar{display:none;}
+.nav-arrow{position:absolute;top:0;bottom:.5rem;width:32px;
+           display:flex;align-items:center;justify-content:center;
+           background:var(--bg);border:.5px solid var(--border);border-radius:6px;
+           color:var(--muted);cursor:pointer;font-size:16px;font-weight:600;
+           transition:all .15s ease;z-index:2;user-select:none;font-family:inherit;padding:0;}
+.nav-arrow:hover{color:var(--text);background:var(--card);border-color:var(--muted-2);
+                 box-shadow:0 2px 8px rgba(0,0,0,.06);}
+.nav-arrow:disabled{opacity:.25;cursor:not-allowed;background:transparent;box-shadow:none;}
+.nav-arrow.left{left:0;}
+.nav-arrow.right{right:0;}
+.persona-pill{background:transparent;border:.5px solid var(--border);color:var(--muted);
+              padding:.5rem .95rem;border-radius:999px;font-size:12.5px;font-weight:500;
+              cursor:pointer;white-space:nowrap;transition:all .15s ease;font-family:inherit;flex-shrink:0;}
+.persona-pill:hover{color:var(--text);border-color:var(--muted-2);}
+.persona-pill.active{background:var(--blue-t);color:#fff;border-color:var(--blue-t);}
+.persona-pill .count{display:inline-block;margin-left:6px;padding:1px 7px;
+                     background:rgba(0,0,0,.06);border-radius:999px;font-size:10.5px;}
+.persona-pill.active .count{background:rgba(255,255,255,.2);}
+
+/* Persona header */
+.persona-header{margin-bottom:1.5rem;}
+.persona-label{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+               color:var(--muted);margin-bottom:.4rem;}
+.persona-title{font-size:26px;font-weight:600;line-height:1.2;margin-bottom:.5rem;}
+.persona-meta{font-size:12.5px;color:var(--muted);line-height:1.5;max-width:720px;}
+.persona-meta strong{color:var(--text);font-weight:500;}
+
+.section-head{font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+              color:var(--muted);margin:1.5rem 0 .75rem;
+              display:flex;align-items:center;gap:8px;}
+.section-head::after{content:'';flex:1;height:.5px;background:var(--border);}
+
+/* Accordion */
+.query-list{display:flex;flex-direction:column;gap:.5rem;}
+.query-card{background:var(--card);border:.5px solid var(--border);border-radius:10px;
+            overflow:hidden;transition:box-shadow .2s ease;}
+.query-card:hover{box-shadow:0 2px 12px rgba(0,0,0,.04);}
+.query-card.open{box-shadow:0 4px 20px rgba(0,0,0,.06);}
+.query-head{display:flex;align-items:center;gap:.85rem;padding:.95rem 1.1rem;
+            cursor:pointer;user-select:none;transition:background .12s ease;}
+.query-head:hover{background:rgba(0,0,0,.015);}
+.query-chevron{flex-shrink:0;width:16px;height:16px;color:var(--muted-2);
+               transition:transform .25s ease;}
+.query-card.open .query-chevron{transform:rotate(90deg);}
+.query-title{flex:1;font-size:13.5px;color:var(--text);font-weight:500;
+             line-height:1.45;word-break:break-word;}
+.query-badges{display:flex;gap:.35rem;flex-shrink:0;flex-wrap:wrap;
+              justify-content:flex-end;max-width:40%;}
+.llm-badge{font-size:10.5px;padding:2px 8px;border-radius:999px;color:#fff;
+           font-weight:500;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;}
+.llm-badge-count{background:rgba(255,255,255,.28);padding:0 6px;border-radius:999px;
+                 font-size:10px;font-weight:600;min-width:14px;text-align:center;}
+.query-evals{font-size:11px;color:var(--muted);background:rgba(0,0,0,.04);
+             padding:2px 8px;border-radius:999px;white-space:nowrap;}
+
+.query-body{max-height:0;overflow:hidden;transition:max-height .5s ease;}
+.query-card.open .query-body{max-height:20000px;}
+.query-body-inner{padding:.4rem 1.1rem 1.25rem;}
+
+/* Criterion histograms grid */
+.crit-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(440px,1fr));
+           gap:1rem;margin-top:.8rem;}
+.crit-card{border:.5px solid var(--border);border-radius:8px;padding:.8rem .9rem;
+           background:#fafaf7;}
+.crit-name{font-size:12.5px;font-weight:600;color:var(--text);
+           letter-spacing:-.005em;margin-bottom:.5rem;}
+.crit-meta{font-size:10.5px;color:var(--muted);margin-bottom:.6rem;}
+.chart-wrap{position:relative;height:200px;}
+.crit-empty{padding:1rem;text-align:center;font-size:11px;color:var(--muted-2);}
+
+.empty{padding:2.5rem 1rem;text-align:center;font-size:13px;color:var(--muted);}
+</style>
+</head>
+<body>
+
+<div class="meta-stamp">Generated 6/6/2026, 5:05:04 μ.μ.</div>
+<h1 class="title">CultureBotEval — Criteria Histograms</h1>
+<div class="subtitle">Per-query rating distribution, grouped by LLM</div>
+
+<div id="root"></div>
+
+<script id="report-data" type="application/json">{"personas":{},"summary":{"personas":0,"queries":0,"evals":0,"llms":0,"evaluators":0}}</script>
+<script>
+(function(){
+  const DATA       = JSON.parse(document.getElementById('report-data').textContent);
+  const LLM_COLORS = {"ChatGPT":"#10a37f","Gemini":"#4285f4","SearchCultureBot v1":"#b14dd1","SearchCultureBot v2":"#7e57c2","SearchCultureBot v3":"#dc4b64"};
+  const llmColor   = n => LLM_COLORS[n] || '#6b7280';
+
+  function esc(s){
+    return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  const root = document.getElementById('root');
+  const personaNames = Object.keys(DATA.personas).sort();
+
+  if(!personaNames.length){
+    root.innerHTML = '<div class="empty">📭 No evaluations found.</div>';
+    return;
+  }
+
+  const state = { current: personaNames[0] };
+  const chartInstances = []; // track to destroy on re-render
+
+  function render(){
+    // Destroy existing charts
+    while(chartInstances.length){
+      try{ chartInstances.pop().destroy(); }catch(e){}
+    }
+
+    const P = DATA.personas[state.current];
+    const s = DATA.summary;
+
+    root.innerHTML = `
+      <div class="summary">
+        <span class="summary-chip"><strong>${s.personas}</strong> personas</span>
+        <span class="summary-chip"><strong>${s.queries}</strong> queries</span>
+        <span class="summary-chip"><strong>${s.llms}</strong> LLMs</span>
+        <span class="summary-chip"><strong>${s.evals}</strong> evaluations</span>
+        <span class="summary-chip"><strong>${s.evaluators}</strong> unique evaluators</span>
+      </div>
+      <div class="persona-nav-wrap">
+        <button class="nav-arrow left" id="nav-arrow-left" aria-label="Scroll left">‹</button>
+        <div class="persona-nav" id="persona-nav"></div>
+        <button class="nav-arrow right" id="nav-arrow-right" aria-label="Scroll right">›</button>
+      </div>
+      <div id="persona-body"></div>
+    `;
+
+    const nav = document.getElementById('persona-nav');
+    personaNames.forEach(name=>{
+      const btn = document.createElement('button');
+      btn.className = 'persona-pill' + (name===state.current?' active':'');
+      btn.innerHTML = `${esc(name)}<span class="count">${DATA.personas[name].evalCount}</span>`;
+      btn.onclick = ()=>{ state.current = name; render(); };
+      nav.appendChild(btn);
+    });
+
+    // Wire up scroll arrows
+    const leftArrow  = document.getElementById('nav-arrow-left');
+    const rightArrow = document.getElementById('nav-arrow-right');
+    const updateArrows = () => {
+      const maxScroll = nav.scrollWidth - nav.clientWidth;
+      leftArrow.disabled  = nav.scrollLeft <= 2;
+      rightArrow.disabled = nav.scrollLeft >= maxScroll - 2;
+      // Hide both arrows if no overflow at all
+      const overflows = nav.scrollWidth > nav.clientWidth + 4;
+      leftArrow.style.display  = overflows ? 'flex' : 'none';
+      rightArrow.style.display = overflows ? 'flex' : 'none';
+    };
+    leftArrow.onclick  = () => nav.scrollBy({left:-220, behavior:'smooth'});
+    rightArrow.onclick = () => nav.scrollBy({left:220, behavior:'smooth'});
+    nav.addEventListener('scroll', updateArrows);
+    // Initial + post-layout checks
+    updateArrows();
+    setTimeout(updateArrows, 50);
+    window.addEventListener('resize', updateArrows);
+
+    // Scroll active pill into view
+    const activeBtn = nav.querySelector('.persona-pill.active');
+    if(activeBtn){
+      const pillOffset = activeBtn.offsetLeft;
+      const pillWidth  = activeBtn.offsetWidth;
+      const navWidth   = nav.clientWidth;
+      if(pillOffset + pillWidth > nav.scrollLeft + navWidth || pillOffset < nav.scrollLeft){
+        nav.scrollTo({left: Math.max(0, pillOffset - navWidth/2 + pillWidth/2), behavior:'smooth'});
+      }
+    }
+
+    renderPersona(P);
+  }
+
+  function renderPersona(P){
+    const body = document.getElementById('persona-body');
+    const qNames = Object.keys(P.queries).sort();
+
+    body.innerHTML = `
+      <div class="persona-header">
+        <div class="persona-label">Persona</div>
+        <h1 class="persona-title">${esc(P.title)}</h1>
+        ${P.role ? `<div class="persona-meta">${esc(P.role)}</div>` : ''}
+        ${P.guidelines ? `<div class="persona-meta" style="margin-top:.5rem;"><strong>Guidelines:</strong> ${esc(P.guidelines)}</div>` : ''}
+      </div>
+      <div class="section-head">Queries · expand to see per-criterion histograms</div>
+      <div class="query-list" id="query-list"></div>
+    `;
+
+    const list = document.getElementById('query-list');
+    qNames.forEach((qName, idx)=>{
+      list.appendChild(buildCard(P.queries[qName], idx, P.title));
+    });
+  }
+
+  function buildCard(Q, idx, personaName){
+    const card = document.createElement('div');
+    card.className = 'query-card';
+    const badges = Q.llms.map(l =>
+      `<span class="llm-badge" style="background:${llmColor(l)}">${esc(l)}<span class="llm-badge-count">${Q.perLlmCount?.[l] ?? 0}</span></span>`
+    ).join('');
+
+    card.innerHTML = `
+      <div class="query-head">
+        <svg class="query-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+        <div class="query-title">${esc(Q.text)}</div>
+        <div class="query-badges">
+          ${badges}
+          <span class="query-evals">${Q.evalCount} eval${Q.evalCount===1?'':'s'}</span>
+        </div>
+      </div>
+      <div class="query-body"><div class="query-body-inner"></div></div>
+    `;
+
+    const head = card.querySelector('.query-head');
+    const inner = card.querySelector('.query-body-inner');
+    let rendered = false;
+
+    head.onclick = ()=>{
+      card.classList.toggle('open');
+      if(!rendered){
+        renderQueryCharts(inner, Q, personaName+'_'+idx);
+        rendered = true;
+      }
+    };
+    if(idx===0) setTimeout(()=>head.click(), 30);
+    return card;
+  }
+
+  function renderQueryCharts(container, Q, prefix){
+    const grid = document.createElement('div');
+    grid.className = 'crit-grid';
+
+    Q.criteria.forEach((crit, cIdx)=>{
+      const card = document.createElement('div');
+      card.className = 'crit-card';
+      const cid = `chart_${prefix}_${cIdx}`;
+
+      // Check if any LLM has any ratings for this criterion
+      const hasAny = Q.llms.some(l => crit.perLlm[l] && crit.perLlm[l].total>0);
+
+      if(!hasAny){
+        card.innerHTML = `
+          <div class="crit-name">${esc(crit.name)}</div>
+          <div class="crit-empty">No ratings for this criterion</div>`;
+        grid.appendChild(card);
+        return;
+      }
+
+      const totalN = Q.llms.reduce((a,l)=>a+(crit.perLlm[l]?.total||0), 0);
+      card.innerHTML = `
+        <div class="crit-name">${esc(crit.name)}</div>
+        <div class="crit-meta">Ratings: ${totalN} · Levels: ${crit.levels.length}</div>
+        <div class="chart-wrap"><canvas id="${cid}"></canvas></div>`;
+      grid.appendChild(card);
+
+      // Build datasets: one per LLM
+      const datasets = Q.llms.map(llm=>{
+        const dist = (crit.perLlm[llm]?.counts) || {};
+        return {
+          label: llm,
+          data: crit.levels.map(l => dist[l] || 0),
+          backgroundColor: llmColor(llm),
+          borderColor: llmColor(llm),
+          borderWidth: 0,
+          borderRadius: 4,
+          maxBarThickness: 38
+        };
+      });
+
+      // Render chart after DOM insertion
+      requestAnimationFrame(()=>{
+        const canvas = document.getElementById(cid);
+        if(!canvas) return;
+        const chart = new Chart(canvas, {
+          type:'bar',
+          data:{ labels: crit.levels, datasets },
+          options:{
+            responsive:true, maintainAspectRatio:false,
+            plugins:{
+              legend:{position:'bottom', labels:{font:{size:10},boxWidth:10,padding:8,usePointStyle:true}},
+              tooltip:{
+                callbacks:{
+                  label: ctx => ` ${ctx.dataset.label}: ${ctx.raw} evaluator${ctx.raw===1?'':'s'}`
+                }
+              }
+            },
+            scales:{
+              x:{ ticks:{font:{size:10},maxRotation:30,minRotation:0}, grid:{display:false} },
+              y:{ beginAtZero:true, ticks:{stepSize:1,font:{size:10},precision:0},
+                  title:{display:true,text:'# evaluators',font:{size:10}},
+                  grid:{color:'rgba(0,0,0,.05)'} }
+            }
+          }
+        });
+        chartInstances.push(chart);
+      });
+    });
+
+    container.appendChild(grid);
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
