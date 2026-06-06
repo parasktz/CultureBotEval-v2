@@ -263,6 +263,18 @@ a.link:hover{text-decoration:underline;}
       </div>
 
       <div class="gen-box">
+        <h3>👥 File 3 — Evaluator Activity</h3>
+        <p>Per-evaluator breakdown: total ratings, queries and LLMs covered, plus a Query × LLM matrix. Mirrors <em>report-evaluators.html</em>.</p>
+        <div class="gen-actions">
+          <button class="btn sm" onclick="generateAndPush(3)">
+            <span class="spin" id="spin3" style="display:none;"></span>
+            Generate &amp; Push
+          </button>
+          <button class="btn secondary sm" onclick="previewFile(3)">Preview</button>
+        </div>
+      </div>
+
+      <div class="gen-box">
         <h3>🔍 Debug Evaluations</h3>
         <p>Checks how many sessions have evaluations and shows the data structure detected.</p>
         <div class="gen-actions">
@@ -271,11 +283,11 @@ a.link:hover{text-decoration:underline;}
       </div>
 
       <div class="gen-box">
-        <h3>⚡ Generate Both</h3>
+        <h3>⚡ Generate All</h3>
         <div class="gen-actions">
           <button class="btn" onclick="generateBoth()">
             <span class="spin" id="spinBoth" style="display:none;"></span>
-            Generate &amp; Push Both
+            Generate &amp; Push All
           </button>
         </div>
       </div>
@@ -652,17 +664,21 @@ function log(type, msg){
    GENERATE
 ═══════════════════════════════════════════════ */
 async function generateAndPush(fileNum){
-  const spinId = fileNum===1?'spin1':'spin2';
+  const spinId = fileNum===1?'spin1':(fileNum===2?'spin2':'spin3');
   setSpin(spinId,true);
   log('info',`Starting File ${fileNum} generation…`);
   try{
     if(!fbData) await fetchFirebase();
-    const html     = fileNum===1 ? buildFile1(fbData) : buildFile2(fbData);
+    const html = fileNum===1 ? buildFile1(fbData)
+               : fileNum===2 ? buildFile2(fbData)
+               :               buildFile3(fbData);
     const ts       = datetimePrefix();
-    const filename = `${ts}_statistics${fileNum===1?'':'-criteria'}.html`;
+    const suffix   = fileNum===1?'':(fileNum===2?'-criteria':'-evaluators');
+    const type     = fileNum===1?'stats':(fileNum===2?'criteria':'evaluators');
+    const filename = `${ts}_statistics${suffix}.html`;
     await pushToGitHub(filename, html);
-    await saveReportRecord(filename, fileNum===1?'stats':'criteria', fbData);
-    await updateLatestPointerSingle(filename, fileNum===1?'stats':'criteria');
+    await saveReportRecord(filename, type, fbData);
+    await updateLatestPointerSingle(filename, type);
     log('ok',`✓ ${filename} pushed & latest pointer updated.`);
   }catch(e){ log('err','Error: '+e.message); }
   setSpin(spinId,false);
@@ -670,19 +686,23 @@ async function generateAndPush(fileNum){
 
 async function generateBoth(){
   setSpin('spinBoth',true);
-  log('info','Generating both files…');
+  log('info','Generating all reports…');
   try{
     if(!fbData) await fetchFirebase();
     const ts = datetimePrefix();
     const f1 = `${ts}_statistics.html`;
     const f2 = `${ts}_statistics-criteria.html`;
+    const f3 = `${ts}_statistics-evaluators.html`;
     await pushToGitHub(f1, buildFile1(fbData));
     log('ok',`✓ ${f1} pushed.`);
     await pushToGitHub(f2, buildFile2(fbData));
     log('ok',`✓ ${f2} pushed.`);
-    await saveReportRecord(f1, 'stats',    fbData);
-    await saveReportRecord(f2, 'criteria', fbData);
-    await updateLatestPointer(f1, f2);
+    await pushToGitHub(f3, buildFile3(fbData));
+    log('ok',`✓ ${f3} pushed.`);
+    await saveReportRecord(f1, 'stats',      fbData);
+    await saveReportRecord(f2, 'criteria',   fbData);
+    await saveReportRecord(f3, 'evaluators', fbData);
+    await updateLatestPointer(f1, f2, f3);
     log('ok','✓ Latest pointers updated. Done!');
   }catch(e){ log('err','Error: '+e.message); }
   setSpin('spinBoth',false);
@@ -690,7 +710,9 @@ async function generateBoth(){
 
 async function previewFile(fileNum){
   if(!fbData) await fetchFirebase();
-  const html = fileNum===1 ? buildFile1(fbData) : buildFile2(fbData);
+  const html = fileNum===1 ? buildFile1(fbData)
+             : fileNum===2 ? buildFile2(fbData)
+             :               buildFile3(fbData);
   const w = window.open('','_blank');
   w.document.write(html);
   w.document.close();
@@ -782,7 +804,7 @@ async function saveReportRecord(filename, type, data){
 
   // 2. Retention: keep only THE latest report per type. Delete all older
   //    records (regardless of type), so Firebase `reports` never grows
-  //    beyond 1 stats + 1 criteria = 2 records max total.
+  //    beyond 1 stats + 1 criteria + 1 evaluators = 3 records max total.
   const allSnap = await db.ref('reports').once('value');
   const all = [];
   allSnap.forEach(c => {
@@ -826,16 +848,19 @@ async function saveReportRecord(filename, type, data){
   }
 }
 
-async function updateLatestPointer(f1, f2){
+async function updateLatestPointer(f1, f2, f3){
   const owner  = cfg.owner  || 'parasktz';
   const repo   = cfg.repo   || 'CultureBotEval-v2';
   const folder = cfg.folder || 'reports';
   // Use raw.githubusercontent.com — propagates instantly, no GitHub Pages required
-  await db.ref('latestReports').update({
-    stats:    `https://raw.githubusercontent.com/${owner}/${repo}/main/${folder}/${f1}`,
-    criteria: `https://raw.githubusercontent.com/${owner}/${repo}/main/${folder}/${f2}`,
+  const base = `https://raw.githubusercontent.com/${owner}/${repo}/main/${folder}/`;
+  const update = {
+    stats:    base + f1,
+    criteria: base + f2,
     updatedAt: new Date().toISOString()
-  });
+  };
+  if(f3) update.evaluators = base + f3;
+  await db.ref('latestReports').update(update);
 }
 
 async function updateLatestPointerSingle(filename, type){
@@ -1009,103 +1034,132 @@ function buildFile1(data){
     return ids;
   }
 
-  // byPersona[persona][query][llm] = { sessions:N, evaluators:M }
-  const byPersona = {};
-  const perPersonaEvaluators = {}; // Set per persona of unique evaluator IDs
-  const allEvaluators = new Set();
-
-  // Derive {llmLabel: evaluatorCount} for a session from its evaluation records.
+  // Per evaluation record: list its valid {llmLabel, evaluatorId} response pairs.
   // v2: ratings live under evaluations.<key>.llms.<k>.ratings, with llmTitle per LLM.
-  // Falls back to session-level detectLLM for the old direct-ratings shape.
-  function getLlmEvaluatorCounts(s){
+  // Each (record × LLM-with-ratings) counts as ONE response by that evaluator.
+  function getResponses(s){
     const ev = s.evaluations;
-    const counts = {}; // llmLabel -> number of evaluator contributions
-    if(!ev || typeof ev !== 'object') return counts;
+    const out = []; // [{llm, evaluator}]
+    if(!ev || typeof ev !== 'object') return out;
+    const extractId = (obj, fb) =>
+      obj.evaluatorId || obj.evaluatorUid || obj.uid || obj.userId ||
+      obj.by || obj.author || obj.evaluatorEmail || obj.email || fb;
     const children = ev.ratings
-      ? [ev]
+      ? [['_', ev]]
       : Object.entries(ev)
-          .filter(([k,c])=> c && typeof c==='object' && k!=='timestamp' && k!=='metadata' && k!=='by')
-          .map(([,c])=>c);
-    children.forEach(child=>{
+          .filter(([k,c])=> c && typeof c==='object' && k!=='timestamp' && k!=='metadata' && k!=='by');
+    children.forEach(([k, child])=>{
+      const evId = extractId(child, s.creatorUid || s.id || 'anon');
       if(child.ratings){
-        const l = detectLLM(s);
-        counts[l] = (counts[l]||0) + 1;
+        out.push({ llm: detectLLM(s), evaluator: evId });
       } else if(child.llms && typeof child.llms === 'object'){
         Object.values(child.llms).forEach(l=>{
           if(l && typeof l === 'object' && l.ratings){
-            const label = detectLLM({llmTitle:l.llmTitle, llmSource:l.llmSource});
-            counts[label] = (counts[label]||0) + 1;
+            out.push({ llm: detectLLM({llmTitle:l.llmTitle, llmSource:l.llmSource}), evaluator: evId });
           }
         });
       }
     });
-    return counts;
+    return out;
+  }
+
+  // byPersona[persona][query] = {
+  //   sessions, llm:{label:{responses}}, evaluator:{id:{responses,name}},
+  //   evaluators:Set
+  // }
+  const byPersona = {};
+  const perPersonaEvaluators = {}; // Set per persona of unique evaluator IDs
+  const allEvaluators = new Set();
+  let totalEvals = 0;
+
+  // Best-effort display name for an evaluator id, scanned from records.
+  const evNameById = {};
+  function rememberName(s){
+    const ev = s.evaluations;
+    if(!ev || typeof ev !== 'object') return;
+    const recs = ev.ratings ? [ev] : Object.values(ev);
+    recs.forEach(r=>{
+      if(!r || typeof r !== 'object') return;
+      const id = r.evaluatorUid || r.evaluatorEmail || r.evaluator;
+      if(id && !evNameById[id]) evNameById[id] = r.evaluator || r.evaluatorEmail || id;
+    });
   }
 
   allKeys.forEach(k=>{
     const s   = sessions[k];
     const pt  = s.personaTitle || 'Unknown';
     const q   = s.query || '';
-    const evalIds = getEvaluatorIds(s);
-
-    evalIds.forEach(id=>{
-      allEvaluators.add(id);
-      if(!perPersonaEvaluators[pt]) perPersonaEvaluators[pt] = new Set();
-      perPersonaEvaluators[pt].add(id);
-    });
+    rememberName(s);
+    const responses = getResponses(s);
 
     if(!byPersona[pt])    byPersona[pt]    = {};
-    if(!byPersona[pt][q]) byPersona[pt][q] = {};
+    if(!byPersona[pt][q]) byPersona[pt][q] = { sessions:0, llm:{}, evaluator:{}, evaluators:new Set() };
+    const cell = byPersona[pt][q];
+    cell.sessions++;
 
-    const llmCounts = getLlmEvaluatorCounts(s);
-    const llmLabels = Object.keys(llmCounts);
-    // Ensure the session is represented even if it has no evaluations yet.
-    if(!llmLabels.length){
-      const l = detectLLM(s);
-      if(!byPersona[pt][q][l]) byPersona[pt][q][l] = { sessions:0, evaluators:0 };
-      byPersona[pt][q][l].sessions++;
-    } else {
-      llmLabels.forEach(l=>{
-        if(!byPersona[pt][q][l]) byPersona[pt][q][l] = { sessions:0, evaluators:0 };
-        byPersona[pt][q][l].sessions++;
-        byPersona[pt][q][l].evaluators += llmCounts[l];
-      });
-    }
+    responses.forEach(({llm, evaluator})=>{
+      totalEvals++;
+      allEvaluators.add(evaluator);
+      if(!perPersonaEvaluators[pt]) perPersonaEvaluators[pt] = new Set();
+      perPersonaEvaluators[pt].add(evaluator);
+      cell.evaluators.add(evaluator);
+
+      if(!cell.llm[llm]) cell.llm[llm] = { responses:0 };
+      cell.llm[llm].responses++;
+
+      if(!cell.evaluator[evaluator]) cell.evaluator[evaluator] = { responses:0 };
+      cell.evaluator[evaluator].responses++;
+    });
   });
 
   const personaLabels = Object.keys(byPersona);
   const totalQueries  = personaLabels.reduce((a,p)=>a+Object.keys(byPersona[p]).length,0);
   const llmSet = new Set();
-  personaLabels.forEach(p=>Object.values(byPersona[p]).forEach(qMap=>Object.keys(qMap).forEach(l=>llmSet.add(l))));
+  personaLabels.forEach(p=>Object.values(byPersona[p]).forEach(cell=>Object.keys(cell.llm).forEach(l=>llmSet.add(l))));
   const llmList = [...llmSet].filter(l=>l&&l!=='Unknown');
-  const totalEvals = allKeys.reduce((a,k)=>a+getEvaluatorIds(sessions[k]).length,0);
 
   const llmColorMap = buildLlmColorMap(llmList);
-  const llmChip = (l, evals, sessCount) => {
+  const llmChip = (l, responses) => {
     const bg = llmColorMap[l] || '#6b7280';
     const fg = textOnColor(bg);
-    const title = `${evals} evaluator${evals===1?'':'s'} across ${sessCount} session${sessCount===1?'':'s'}`;
-    return `<span class="llm" style="background:${bg};color:${fg};border-color:transparent;" title="${title}">${esc(l)}<span class="llm-chip-count${evals===0?' zero':''}">${evals}</span></span>`;
+    const title = `${responses} response${responses===1?'':'s'} for ${l}`;
+    return `<span class="llm" style="background:${bg};color:${fg};border-color:transparent;" title="${esc(title)}">${esc(l)}<span class="llm-chip-count${responses===0?' zero':''}">${responses}</span></span>`;
+  };
+  const evChip = (id, responses) => {
+    const name = evNameById[id] || id;
+    return `<span class="ev-chip" title="${esc(name)}">${esc(name)}<span class="ev-chip-count">${responses}</span></span>`;
   };
 
   const rolesHtml = personaLabels.map(pt=>{
     const qMap  = byPersona[pt];
     const qKeys = Object.keys(qMap);
-    const totalSessions = qKeys.reduce((a,q)=>{
-      return a + Object.values(qMap[q]).reduce((b,rec)=>b+rec.sessions, 0);
-    },0);
-    const totalEvalsPersona = qKeys.reduce((a,q)=>{
-      return a + Object.values(qMap[q]).reduce((b,rec)=>b+rec.evaluators, 0);
-    },0);
+    const totalSessions = qKeys.reduce((a,q)=>a+qMap[q].sessions, 0);
+    const totalRespPersona = qKeys.reduce((a,q)=>
+      a + Object.values(qMap[q].llm).reduce((b,rec)=>b+rec.responses, 0), 0);
     const uniqueEvaluatorsPersona = (perPersonaEvaluators[pt] || new Set()).size;
     const rows = qKeys.map((q,i)=>{
-      const llmEntries = Object.entries(qMap[q]);
+      const cell = qMap[q];
+      const llmEntries = Object.entries(cell.llm).sort((a,b)=>b[1].responses-a[1].responses);
+      const evEntries  = Object.entries(cell.evaluator).sort((a,b)=>b[1].responses-a[1].responses);
+      const totalResp  = llmEntries.reduce((a,[,r])=>a+r.responses,0);
       return `
       <div class="q-row">
         <div class="q-idx">${i+1}</div>
         <div class="q-body">
           <div class="q-text">${esc(q)}</div>
-          <div class="llms">${llmEntries.map(([l,rec])=>llmChip(l, rec.evaluators, rec.sessions)).join('')}</div>
+          <div class="q-metrics">
+            <span class="q-metric"><strong>${cell.evaluators.size}</strong> unique evaluator${cell.evaluators.size!==1?'s':''}</span>
+            <span class="q-metric"><strong>${totalResp}</strong> response${totalResp!==1?'s':''}</span>
+            <span class="q-metric"><strong>${llmEntries.length}</strong> LLM${llmEntries.length!==1?'s':''}</span>
+          </div>
+          <div class="sub-row">
+            <span class="sub-lbl">Responses per LLM</span>
+            <div class="llms">${llmEntries.map(([l,rec])=>llmChip(l, rec.responses)).join('') || '<span class="none">—</span>'}</div>
+          </div>
+          <div class="sub-row">
+            <span class="sub-lbl">Responses per evaluator</span>
+            <div class="evs">${evEntries.map(([id,rec])=>evChip(id, rec.responses)).join('') || '<span class="none">—</span>'}</div>
+          </div>
         </div>
       </div>`;
     }).join('');
@@ -1116,7 +1170,7 @@ function buildFile1(data){
         <div class="badges">
           <span class="badge b-blue">${qKeys.length} quer${qKeys.length!==1?'ies':'y'}</span>
           <span class="badge b-green">${totalSessions} session${totalSessions!==1?'s':''}</span>
-          <span class="badge b-amber">${totalEvalsPersona} evaluation${totalEvalsPersona!==1?'s':''}</span>
+          <span class="badge b-amber">${totalRespPersona} response${totalRespPersona!==1?'s':''}</span>
           <span class="badge b-purple">${uniqueEvaluatorsPersona} unique evaluator${uniqueEvaluatorsPersona!==1?'s':''}</span>
         </div>
       </div>
@@ -1165,7 +1219,17 @@ h1{font-size:22px;font-weight:500;margin-bottom:.3rem;}
        font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;}
 .q-body{flex:1;min-width:0;}
 .q-text{font-size:13px;color:var(--text);line-height:1.6;margin-bottom:6px;word-break:break-word;white-space:pre-wrap;}
-.llms{display:flex;flex-wrap:wrap;gap:4px;}
+.q-metrics{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
+.q-metric{font-size:11px;background:var(--bg);border:.5px solid var(--border);border-radius:6px;padding:2px 8px;color:var(--muted);}
+.q-metric strong{color:var(--text);}
+.sub-row{display:flex;align-items:flex-start;gap:8px;margin:5px 0;flex-wrap:wrap;}
+.sub-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-2,#a8a89e);min-width:150px;padding-top:3px;}
+.evs{display:flex;flex-wrap:wrap;gap:4px;flex:1;}
+.ev-chip{font-size:11px;border-radius:4px;padding:2px 9px;background:#eef1f4;color:#334;border:.5px solid rgba(0,0,0,.08);
+         display:inline-flex;align-items:center;gap:5px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ev-chip-count{background:rgba(0,0,0,.12);padding:0 6px;border-radius:999px;font-size:10px;font-weight:700;min-width:14px;text-align:center;line-height:1.5;}
+.none{font-size:11px;color:var(--muted-2,#a8a89e);}
+.llms{display:flex;flex-wrap:wrap;gap:4px;flex:1;}
 .llm{font-size:11px;border-radius:4px;padding:2px 9px;border:.5px solid var(--border);color:var(--muted);background:var(--bg);
      display:inline-flex;align-items:center;gap:5px;}
 .llm-chip-count{background:rgba(0,0,0,.15);padding:0 6px;border-radius:999px;
@@ -1190,7 +1254,7 @@ h1{font-size:22px;font-weight:500;margin-bottom:.3rem;}
   <div class="stat"><div class="stat-lbl">Persona Groups</div><div class="stat-val">${personaLabels.length}</div></div>
   <div class="stat"><div class="stat-lbl">Unique Queries</div><div class="stat-val">${totalQueries}</div></div>
   <div class="stat"><div class="stat-lbl">LLMs</div><div class="stat-val">${llmList.length}</div></div>
-  <div class="stat"><div class="stat-lbl">Evaluations</div><div class="stat-val">${totalEvals}</div></div>
+  <div class="stat"><div class="stat-lbl">LLM Responses</div><div class="stat-val">${totalEvals}</div></div>
   <div class="stat"><div class="stat-lbl">Unique Evaluators</div><div class="stat-val">${allEvaluators.size}</div></div>
 </div>
 ${rolesHtml}
@@ -1199,6 +1263,211 @@ ${rolesHtml}
 </div>
 <script>function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}<\/script>
 </body></html>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   FILE 3 — EVALUATOR ACTIVITY (snapshot of report-evaluators.html)
+═══════════════════════════════════════════════════════════════════ */
+function buildFile3(data){
+  const sessions = data.sessions || {};
+
+  function normIndexed(x){
+    const out=new Array(11).fill(null);
+    if(Array.isArray(x)){ for(let i=1;i<=10&&i<x.length;i++) out[i]=(x[i]===''?null:(x[i]??null)); }
+    else if(x&&typeof x==='object'){ Object.entries(x).forEach(([k,v])=>{const i=parseInt(k,10);if(i>=1&&i<=10)out[i]=(v===''?null:v);}); }
+    return out;
+  }
+  function llmHasRatings(b){ if(!b||typeof b!=='object')return false; const r=normIndexed(b.ratings); for(let i=1;i<=10;i++){if(r[i])return true;} return false; }
+  function validLlmBlocks(rec){
+    if(!rec||typeof rec.llms!=='object'||rec.llms===null) return [];
+    return Object.values(rec.llms).filter(llmHasRatings)
+      .map(l=>({title:(l.llmTitle||'Untitled LLM').toString().trim()||'Untitled LLM'}));
+  }
+
+  // EVAL[key] = {name,email,total,byQuery,byLlm,matrix,queries:Set,llms:Set}
+  const EVAL = {};
+  const GLOBAL_LLMS = new Set();
+
+  Object.values(sessions).forEach(s=>{
+    if(!s || typeof s!=='object') return;
+    const ev = s.evaluations;
+    if(!ev || typeof ev!=='object') return;
+    Object.entries(ev).forEach(([key,rec])=>{
+      if(!rec || typeof rec!=='object') return;
+      if(key==='timestamp' || key==='metadata') return;
+      const blocks = validLlmBlocks(rec);
+      if(!blocks.length) return;
+      const id = rec.evaluatorUid || rec.evaluatorEmail || rec.evaluator || 'anon';
+      const E = EVAL[id] || (EVAL[id] = {
+        name: rec.evaluator || rec.evaluatorEmail || 'Unknown',
+        email: rec.evaluatorEmail || '',
+        total:0, byQuery:{}, byLlm:{}, matrix:{}, queries:new Set(), llms:new Set()
+      });
+      const q = s.query || '(no query)';
+      blocks.forEach(b=>{
+        const llm = b.title;
+        E.total++;
+        E.byQuery[q] = (E.byQuery[q]||0)+1;
+        E.byLlm[llm] = (E.byLlm[llm]||0)+1;
+        (E.matrix[q] = E.matrix[q]||{})[llm] = (E.matrix[q][llm]||0)+1;
+        E.queries.add(q); E.llms.add(llm);
+        GLOBAL_LLMS.add(llm);
+      });
+    });
+  });
+
+  // Serialise (Sets → arrays)
+  const evList = Object.entries(EVAL).map(([k,e])=>({
+    key:k, name:e.name, email:e.email, total:e.total,
+    byQuery:e.byQuery, byLlm:e.byLlm, matrix:e.matrix,
+    queries:[...e.queries], llms:[...e.llms]
+  }));
+  const allQ = new Set(); evList.forEach(e=>e.queries.forEach(q=>allQ.add(q)));
+  const summary = {
+    evaluators: evList.length,
+    totalRatings: evList.reduce((a,e)=>a+e.total,0),
+    queries: allQ.size,
+    llms: GLOBAL_LLMS.size
+  };
+  const colorMap = buildLlmColorMap([...GLOBAL_LLMS]);
+  const payload = { evList, summary, colors:colorMap };
+  const dataJson = JSON.stringify(payload).replace(/</g,'\\u003c');
+
+  return `<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>CultureBotEval — Evaluator Activity</title>
+<style>
+:root{--bg:#f4f3ee;--card:#fff;--border:rgba(0,0,0,.09);--text:#18180f;--muted:#68685f;--muted-2:#a8a89e;
+  --blue:#2b7fd4;--blue-bg:#e8f2fc;--blue-t:#0a3d6e;--r:10px;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);padding:2rem 1.25rem 4rem;}
+.wrap{max-width:1000px;margin:0 auto;}
+h1{font-size:22px;font-weight:500;margin-bottom:.3rem;}
+.subtitle{font-size:13px;color:var(--muted);margin-bottom:1.5rem;}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:1.5rem;}
+.card{background:var(--card);border:.5px solid var(--border);border-radius:var(--r);padding:.9rem 1.1rem;}
+.card-lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;}
+.card-val{font-size:26px;font-weight:500;color:var(--blue-t);}
+.ev-card{background:var(--card);border:.5px solid var(--border);border-radius:var(--r);margin-bottom:.75rem;overflow:hidden;}
+.ev-head{display:flex;align-items:center;gap:12px;padding:.85rem 1.1rem;cursor:pointer;}
+.ev-chevron{width:18px;height:18px;color:var(--muted);transition:transform .2s;flex-shrink:0;}
+.ev-card.open .ev-chevron{transform:rotate(90deg);}
+.ev-avatar{width:34px;height:34px;border-radius:50%;background:var(--blue-bg);color:var(--blue-t);
+           font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.ev-id{flex:1;min-width:0;}
+.ev-name{font-size:14px;font-weight:600;color:var(--text);}
+.ev-email{font-size:11px;color:var(--muted);}
+.ev-chips{display:flex;gap:5px;flex-wrap:wrap;}
+.ev-chip{font-size:11px;background:var(--bg);border:.5px solid var(--border);border-radius:999px;padding:2px 9px;color:var(--muted);}
+.ev-chip strong{color:var(--text);}
+.ev-body{max-height:0;overflow:hidden;transition:max-height .25s ease;}
+.ev-card.open .ev-body{max-height:2000px;}
+.ev-body-inner{padding:0 1.1rem 1.1rem;}
+.sub-h{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:.9rem 0 .5rem;}
+.llm-bar{display:flex;flex-wrap:wrap;gap:5px;}
+.llm-pill{font-size:11px;border-radius:4px;padding:2px 9px;color:#fff;display:inline-flex;align-items:center;gap:5px;}
+.llm-pill .n{background:rgba(255,255,255,.3);padding:0 6px;border-radius:999px;font-size:10px;font-weight:700;}
+.matrix-wrap{overflow-x:auto;}
+.matrix{border-collapse:collapse;font-size:12px;width:100%;}
+.matrix th,.matrix td{border:.5px solid var(--border);padding:5px 9px;text-align:center;}
+.matrix th{background:var(--bg);font-weight:600;font-size:11px;}
+.matrix th.q,.matrix td.q{text-align:left;max-width:340px;}
+.matrix .tot{font-weight:700;background:#fafaf7;}
+.llm-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:middle;}
+.cell-n{font-weight:600;}
+.cell-0{color:var(--muted-2);font-weight:400;}
+.empty{padding:3rem 1rem;text-align:center;color:var(--muted);}
+.gen-info{font-size:11px;color:var(--muted);margin-top:2rem;padding-top:1rem;border-top:.5px solid var(--border);font-family:monospace;}
+.controls{display:flex;justify-content:flex-end;margin-bottom:.75rem;}
+.controls select{padding:.4rem .6rem;border:.5px solid var(--border);border-radius:6px;font-size:12px;background:var(--card);}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>CultureBotEval — Evaluator Activity</h1>
+<div class="subtitle">${new Date().toLocaleDateString('el-GR')} · snapshot</div>
+<div class="cards" id="cards"></div>
+<div class="controls">
+  <select id="sort-sel" onchange="renderList()">
+    <option value="total">Πλήθος αξιολογήσεων (φθίνουσα)</option>
+    <option value="queries">Πλήθος queries</option>
+    <option value="name">Όνομα (Α→Ω)</option>
+  </select>
+</div>
+<div id="ev-list"></div>
+<div class="gen-info">Generated: ${new Date().toISOString()} · CultureBotEval Admin</div>
+</div>
+
+<script id="report-data" type="application/json">${dataJson}<\/script>
+<script>
+(function(){
+  const P = JSON.parse(document.getElementById('report-data').textContent);
+  const EVAL = P.evList, SUMMARY = P.summary, LLM_COLOR = P.colors;
+  function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+  function ini(n){return String(n||'?').trim().split(/\\s+/).map(w=>w[0]).join('').substring(0,2).toUpperCase();}
+
+  document.getElementById('cards').innerHTML =
+    '<div class="card"><div class="card-lbl">Evaluators</div><div class="card-val">'+SUMMARY.evaluators+'</div></div>'+
+    '<div class="card"><div class="card-lbl">Σύνολο αξιολογήσεων</div><div class="card-val">'+SUMMARY.totalRatings+'</div></div>'+
+    '<div class="card"><div class="card-lbl">Queries</div><div class="card-val">'+SUMMARY.queries+'</div></div>'+
+    '<div class="card"><div class="card-lbl">LLMs</div><div class="card-val">'+SUMMARY.llms+'</div></div>';
+
+  window.renderList = function(){
+    const sortBy = document.getElementById('sort-sel').value;
+    let evs = EVAL.slice();
+    if(!evs.length){ document.getElementById('ev-list').innerHTML='<div class="empty">📭 Καμία αξιολόγηση ακόμη.</div>'; return; }
+    evs.sort((a,b)=>{
+      if(sortBy==='name') return a.name.localeCompare(b.name,'el');
+      if(sortBy==='queries') return b.queries.length-a.queries.length || b.total-a.total;
+      return b.total-a.total;
+    });
+    document.getElementById('ev-list').innerHTML = evs.map((e,idx)=>buildCard(e,idx)).join('');
+    document.querySelectorAll('.ev-head').forEach(h=>{ h.onclick=()=>h.parentElement.classList.toggle('open'); });
+  };
+
+  function buildCard(e,idx){
+    const llms = e.llms.slice().sort();
+    const llmPills = Object.entries(e.byLlm).sort((a,b)=>b[1]-a[1]).map(([llm,n])=>{
+      const c = LLM_COLOR[llm]||'#6b7280';
+      return '<span class="llm-pill" style="background:'+c+'">'+esc(llm)+'<span class="n">'+n+'</span></span>';
+    }).join('');
+    const queryList = Object.entries(e.byQuery).sort((a,b)=>b[1]-a[1]);
+    const cols = llms;
+    const head = '<tr><th class="q">Query</th>'+cols.map(l=>'<th><span class="llm-dot" style="background:'+(LLM_COLOR[l]||'#6b7280')+'"></span>'+esc(l)+'</th>').join('')+'<th class="tot">Σύνολο</th></tr>';
+    const rows = queryList.map(([q])=>{
+      const cells = cols.map(l=>{ const n=(e.matrix[q]&&e.matrix[q][l])||0; return '<td><span class="cell-n'+(n===0?' cell-0':'')+'">'+(n||'·')+'</span></td>'; }).join('');
+      const rowTot = cols.reduce((a,l)=>a+((e.matrix[q]&&e.matrix[q][l])||0),0);
+      return '<tr><td class="q">'+esc(q)+'</td>'+cells+'<td class="tot">'+rowTot+'</td></tr>';
+    }).join('');
+    const colTotals = cols.map(l=>'<td class="tot">'+(e.byLlm[l]||0)+'</td>').join('');
+    const footer = '<tr><td class="q tot">Σύνολο</td>'+colTotals+'<td class="tot">'+e.total+'</td></tr>';
+    return '<div class="ev-card'+(idx===0?' open':'')+'">'+
+      '<div class="ev-head">'+
+        '<svg class="ev-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>'+
+        '<div class="ev-avatar">'+ini(e.name)+'</div>'+
+        '<div class="ev-id"><div class="ev-name">'+esc(e.name)+'</div>'+(e.email?'<div class="ev-email">'+esc(e.email)+'</div>':'')+'</div>'+
+        '<div class="ev-chips">'+
+          '<span class="ev-chip"><strong>'+e.total+'</strong> αξιολογήσεις</span>'+
+          '<span class="ev-chip"><strong>'+e.queries.length+'</strong> queries</span>'+
+          '<span class="ev-chip"><strong>'+e.llms.length+'</strong> LLMs</span>'+
+        '</div>'+
+      '</div>'+
+      '<div class="ev-body"><div class="ev-body-inner">'+
+        '<div class="sub-h">Αξιολογήσεις ανά LLM</div><div class="llm-bar">'+llmPills+'</div>'+
+        '<div class="sub-h">Πίνακας: Query × LLM (πλήθος αξιολογήσεων)</div>'+
+        '<div class="matrix-wrap"><table class="matrix"><thead>'+head+'</thead><tbody>'+rows+footer+'</tbody></table></div>'+
+      '</div></div>'+
+    '</div>';
+  }
+
+  renderList();
+})();
+<\/script>
+</body>
+</html>`;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1249,6 +1518,7 @@ function buildFile2(data){
   // First pass: collect all evaluations, keep ALL evaluator ratings (not just "latest")
   // so that histograms count ALL ratings from all evaluators
   const grouped = {}; // { persona: { query: { llm: [ratings, ratings, ...] } } }
+  const queryEvaluators = {}; // { persona: { query: Set(evaluatorId) } }
 
   Object.values(sessions).forEach(s=>{
     const ev = s.evaluations;
@@ -1286,6 +1556,9 @@ function buildFile2(data){
 
       // This evaluator contributed at least one rating to this session.
       DATA.summary.evaluators.add(evId);
+      if(!queryEvaluators[persona]) queryEvaluators[persona] = {};
+      if(!queryEvaluators[persona][query]) queryEvaluators[persona][query] = new Set();
+      queryEvaluators[persona][query].add(evId);
 
       pairs.forEach(([llm, ratings])=>{
         if(llm === 'Unknown') return;
@@ -1353,6 +1626,7 @@ function buildFile2(data){
       pData.queries[query] = {
         text: query,
         evalCount: qEvalCount,
+        evaluators: (queryEvaluators[persona] && queryEvaluators[persona][query]) ? queryEvaluators[persona][query].size : 0,
         llms: llmList,
         perLlmCount,
         criteria
@@ -1461,6 +1735,8 @@ h1.title{font-size:22px;font-weight:500;margin-bottom:.3rem;}
 .llm-badge-count{background:rgba(255,255,255,.28);padding:0 6px;border-radius:999px;
                  font-size:10px;font-weight:600;min-width:14px;text-align:center;}
 .query-evals{font-size:11px;color:var(--muted);background:rgba(0,0,0,.04);
+             padding:2px 8px;border-radius:999px;white-space:nowrap;}
+.query-evaluators{font-size:11px;color:#4527a0;background:#ede7f6;
              padding:2px 8px;border-radius:999px;white-space:nowrap;}
 
 .query-body{max-height:0;overflow:hidden;transition:max-height .5s ease;}
@@ -1618,6 +1894,7 @@ h1.title{font-size:22px;font-weight:500;margin-bottom:.3rem;}
         <div class="query-badges">
           \${badges}
           <span class="query-evals">\${Q.evalCount} eval\${Q.evalCount===1?'':'s'}</span>
+          <span class="query-evaluators">\${Q.evaluators||0} evaluator\${(Q.evaluators||0)===1?'':'s'}</span>
         </div>
       </div>
       <div class="query-body"><div class="query-body-inner"></div></div>
