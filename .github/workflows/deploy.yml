@@ -56,13 +56,13 @@ jobs:
           grep "projectId" config.js
 
       - name: Setup Pages
-        uses: actions/configure-pages@v5
-
+        uses: actions/configure-pages
+        
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact
         with:
           path: '.'
 
       - name: Deploy
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages
