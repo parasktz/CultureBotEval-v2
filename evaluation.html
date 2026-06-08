@@ -6,9 +6,18 @@
 <title>Persona Evaluation — Νέα Αξιολόγηση</title>
 <link rel="stylesheet" href="styles.css"/>
 <style>
+/* Wider page for side-by-side LLM columns */
+.page{max-width:95%;}
+
+/* Row of LLM columns, side by side */
+.llm-eval-row{
+  display:flex;gap:1rem;align-items:stretch;
+  overflow-x:auto;padding-bottom:.5rem;
+}
 .llm-eval-card{
   background:var(--card);border:.5px solid var(--border);border-radius:var(--r);
-  margin-bottom:1.25rem;overflow:hidden;
+  overflow:hidden;display:flex;flex-direction:column;
+  flex:1 1 0;min-width:340px;
 }
 .llm-eval-head{
   padding:1rem 1.25rem;border-bottom:.5px solid var(--border);background:var(--blue-bg);
@@ -27,7 +36,7 @@
 .llm-desc-short,.llm-desc-full{white-space:pre-wrap;word-break:break-word;}
 .desc-more{border:none;background:none;color:var(--blue-t);font-size:12px;font-weight:600;cursor:pointer;padding:0 2px;font-family:inherit;}
 .desc-more:hover{text-decoration:underline;}
-.llm-eval-body{padding:1rem 1.25rem;}
+.llm-eval-body{padding:1rem 1.25rem;flex:1;}
 .llm-count-badge{
   display:inline-block;font-size:12px;background:var(--blue-bg);color:var(--blue-t);
   border-radius:999px;padding:3px 12px;font-weight:500;
@@ -226,7 +235,7 @@ function buildLlmEvaluations(){
   state = {};
   const area = $('llm-eval-area');
 
-  area.innerHTML = LLMS.map((llm, li) => {
+  area.innerHTML = '<div class="llm-eval-row">' + LLMS.map((llm, li) => {
     state[li] = { ratings:{}, comments:{} };
     const critHtml = CRITERIA.map(c => `
       <div class="cc">
@@ -264,7 +273,7 @@ function buildLlmEvaluations(){
           ${critHtml}
         </div>
       </div>`;
-  }).join('');
+  }).join('') + '</div>';
 
   // wire up option buttons
   document.querySelectorAll('.mco').forEach(b => {
