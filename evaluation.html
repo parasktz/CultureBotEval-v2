@@ -11,13 +11,29 @@
 
 /* Row of LLM columns, side by side */
 .llm-eval-row{
-  display:flex;gap:1rem;align-items:stretch;
-  overflow-x:auto;padding-bottom:.5rem;
+  display:flex;gap:.6rem;align-items:stretch;flex-wrap:nowrap;
+  padding-bottom:.5rem;
 }
 .llm-eval-card{
   background:var(--card);border:.5px solid var(--border);border-radius:var(--r);
   overflow:hidden;display:flex;flex-direction:column;
-  flex:1 1 0;min-width:340px;
+  flex:1 1 0;min-width:0;
+}
+/* Tighten criteria UI so 4 LLM columns fit one screen without breaking */
+.llm-eval-body .cc{padding:.55rem .6rem;margin-bottom:.5rem;}
+.llm-eval-body .ch{gap:5px;margin-bottom:6px;align-items:flex-start;}
+.llm-eval-body .cn{width:18px;height:18px;font-size:10px;}
+.llm-eval-body .cname{font-size:11.5px;line-height:1.3;}
+.llm-eval-body .mcg{gap:4px;margin-bottom:6px;}
+.llm-eval-body .mco{padding:3px 9px;border-radius:14px;font-size:11px;line-height:1.3;}
+.llm-eval-body .fi{font-size:11.5px;}
+.llm-eval-title{font-size:14px;}
+@media(max-width:900px){
+  .llm-eval-row{flex-wrap:wrap;}
+  .llm-eval-card{flex:1 1 calc(50% - .6rem);min-width:240px;}
+}
+@media(max-width:560px){
+  .llm-eval-card{flex:1 1 100%;}
 }
 .llm-eval-head{
   padding:1rem 1.25rem;border-bottom:.5px solid var(--border);background:var(--blue-bg);

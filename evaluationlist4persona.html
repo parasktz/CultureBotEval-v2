@@ -67,15 +67,27 @@
 .edit-form{display:none;border-top:.5px solid var(--border);padding:1.25rem;background:var(--bg);}
 .edit-form.open{display:block;}
 .edit-llm-sec{margin-bottom:1.25rem;}
-.edit-llm-sec-title{font-size:13px;font-weight:600;color:var(--blue-t);margin-bottom:.6rem;display:flex;align-items:center;gap:7px;}
+.edit-llm-row{display:flex;gap:.6rem;align-items:flex-start;flex-wrap:nowrap;}
+.edit-llm-col{flex:1 1 0;min-width:0;background:var(--card);border:.5px solid var(--border);
+  border-radius:var(--rsm);padding:.7rem .65rem;}
+.edit-llm-sec-title{font-size:13px;font-weight:600;color:var(--blue-t);margin-bottom:.6rem;display:flex;align-items:center;gap:6px;flex-wrap:wrap;word-break:break-word;}
 .edit-llm-sec-num{width:20px;height:20px;border-radius:50%;background:var(--blue);color:#fff;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.ecc{background:var(--card);border:.5px solid var(--border);border-radius:var(--rsm);padding:.8rem 1rem;margin-bottom:.6rem;}
-.ech{display:flex;align-items:center;gap:6px;margin-bottom:6px;}
-.ecn{width:20px;height:20px;border-radius:50%;background:var(--blue-bg);color:var(--blue-t);font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.ecname{font-size:12px;font-weight:500;}
+.ecc{background:var(--card);border:.5px solid var(--border);border-radius:var(--rsm);padding:.55rem .6rem;margin-bottom:.5rem;}
+.ech{display:flex;align-items:flex-start;gap:5px;margin-bottom:6px;}
+.ecn{width:18px;height:18px;border-radius:50%;background:var(--blue-bg);color:var(--blue-t);font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.ecname{font-size:11.5px;font-weight:500;line-height:1.3;}
 .emcg{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;}
-.emco{padding:4px 12px;border-radius:20px;border:.5px solid var(--border2);font-size:12px;cursor:pointer;background:transparent;color:var(--text);font-family:inherit;transition:all .15s;}
+.emco{padding:3px 9px;border-radius:14px;border:.5px solid var(--border2);font-size:11px;line-height:1.3;cursor:pointer;background:transparent;color:var(--text);font-family:inherit;transition:all .15s;}
 .emco:hover{background:var(--card);}
+
+/* On narrow screens, allow the 4 columns to wrap to 2x2 instead of overflowing */
+@media(max-width:900px){
+  .edit-llm-row{flex-wrap:wrap;}
+  .edit-llm-col{flex:1 1 calc(50% - .6rem);min-width:240px;}
+}
+@media(max-width:560px){
+  .edit-llm-col{flex:1 1 100%;}
+}
 .emco.sel{border-color:var(--blue);background:var(--blue-bg);color:var(--blue-t);font-weight:500;}
 .emco.er{border-color:var(--red);}
 
@@ -95,6 +107,12 @@
 /* LLM tag next to evaluator email */
 .eval-llm-tag{display:inline-block;font-size:12px;font-weight:600;color:var(--blue-t);
   background:var(--blue-bg);border-radius:999px;padding:2px 10px;margin-left:6px;vertical-align:middle;}
+.eval-llm-tag.missing{color:var(--muted);background:transparent;border:1px dashed var(--border2);font-weight:500;}
+.eval-missing-note{font-size:12px;color:var(--amber-t,#9a6a00);background:var(--amber-bg,#fdf3e0);
+  border-radius:var(--rsm);padding:6px 10px;margin-top:.6rem;}
+.edit-llm-col-new{border-color:var(--amber-t,#caa24a);background:#fffdf6;}
+.edit-new-badge{display:inline-block;font-size:10px;font-weight:600;color:#fff;background:var(--amber-t,#caa24a);
+  border-radius:999px;padding:1px 8px;margin-left:6px;vertical-align:middle;}
 </style>
 </head>
 <body>
@@ -208,9 +226,17 @@ async function load(){
       sessionLlmCache[code] = llms;
 
       const allEvals = s.evaluations ? Object.entries(s.evaluations) : [];
-      const evalRows = allEvals.map(([key, ev]) => buildEvalRow(code, key, ev, llms)).join('');
-      const evalsSection = allEvals.length > 0
-        ? `<div class="evals-bar">Αξιολογήσεις (${allEvals.length})</div>${evalRows}`
+      // Group this session's evaluation records by evaluator (uid/email).
+      const byEvaluator = {};
+      allEvals.forEach(([key, ev])=>{
+        const uid = ev.evaluatorUid || ev.evaluatorEmail || ev.evaluator || 'anon';
+        if(!byEvaluator[uid]) byEvaluator[uid] = { uid, records: [] };
+        byEvaluator[uid].records.push([key, ev]);
+      });
+      const evaluatorGroups = Object.values(byEvaluator);
+      const evalRows = evaluatorGroups.map(g => buildEvaluatorGroup(code, g, llms)).join('');
+      const evalsSection = evaluatorGroups.length > 0
+        ? `<div class="evals-bar">Αξιολογήσεις (${evaluatorGroups.length} αξιολογητ${evaluatorGroups.length!==1?'ές':'ής'})</div>${evalRows}`
         : `<div class="evals-bar">Καμία αξιολόγηση ακόμη</div>`;
 
       // Per-LLM evaluation stats: count of evaluations that rated each LLM + evaluator names
@@ -359,46 +385,101 @@ function ratedIndices(ev, llms){
   return idxs;
 }
 
-function buildEvalRow(sessionCode, evalKey, ev, llms){
-  const mine     = isMine(ev);
-  const stateKey = sessionCode+'___'+evalKey;
-  const perLlm   = evalLlmData(ev, llms);
-  const rated    = ratedIndices(ev, llms);            // indices this eval actually rated
-  const showIdx  = rated.length ? rated : llms.map((_,i)=>i); // fallback: all
+function buildEvaluatorGroup(sessionCode, group, llms){
+  const recs = group.records;                       // [[key, ev], ...] for one evaluator
+  const ev0  = recs[0][1];
+  const mine = recs.some(([,ev]) => isMine(ev));
+  const stateKey = sessionCode+'___'+group.uid;
 
-  editState[stateKey] = { llms:{} };
-  perLlm.forEach((d, li) => {
+  // Merge all this evaluator's records into per-LLM ratings/comments.
+  // Match each record's LLM(s) to the session llms[] by llmTitle, else by index.
+  const titleToIdx = {};
+  llms.forEach((l, i) => { titleToIdx[(l.title||'').trim()] = i; });
+
+  const merged = {};               // li -> {ratings, comments, timestamp, lastEdited}
+  const recordKeyForLlm = {};      // li -> original record key (for save/cleanup)
+  const evaluatorName = ev0.evaluator || ev0.evaluatorEmail || '—';
+
+  recs.forEach(([key, ev]) => {
+    const perLlm = evalLlmData(ev, llms);
+    const rated  = ratedIndices(ev, llms);
+    // Determine which session-LLM index each rated block belongs to (prefer llmTitle).
+    rated.forEach(srcIdx => {
+      let li = srcIdx;
+      const t = (ev.llms && ev.llms[srcIdx] && (ev.llms[srcIdx].llmTitle||'').trim()) || '';
+      if(t && t in titleToIdx) li = titleToIdx[t];
+      merged[li] = {
+        ratings:  Object.assign({}, perLlm[srcIdx].ratings  || {}),
+        comments: Object.assign({}, perLlm[srcIdx].comments || {}),
+        timestamp: ev.timestamp || '',
+        lastEdited: ev.lastEdited || ''
+      };
+      recordKeyForLlm[li] = key;
+    });
+  });
+
+  const ratedIdx = Object.keys(merged).map(Number).sort((a,b)=>a-b);
+
+  // Build edit state covering ALL session LLMs (rated -> preloaded, others -> empty)
+  editState[stateKey] = { llms:{}, recordKeyForLlm, uid: group.uid };
+  llms.forEach((l, li) => {
+    const m = merged[li];
     editState[stateKey].llms[li] = {
-      ratings:  Object.assign({}, d.ratings  || {}),
-      comments: Object.assign({}, d.comments || {})
+      ratings:  m ? Object.assign({}, m.ratings)  : {},
+      comments: m ? Object.assign({}, m.comments) : {}
     };
   });
 
-  // LLM label(s) shown next to the evaluator email
-  const ratedTitles = showIdx.map(li => (llms[li] && llms[li].title) || ('LLM #'+(li+1)));
-  const llmTag = `<span class="eval-llm-tag">${ratedTitles.map(esc).join(', ')}</span>`;
+  const mineBadge = mine ? `<span class="eval-mine">Η αξιολόγησή μου</span>` : '';
 
-  // Read-only chips — only for the LLM(s) this evaluation rated
-  const chipsByLlm = showIdx.map(li => {
+  // LLM tags next to the email: rated ones highlighted, missing ones muted
+  const tags = llms.map((l, li) => {
+    const t = l.title || ('LLM #'+(li+1));
+    const rated = (li in merged);
+    return `<span class="eval-llm-tag${rated?'':' missing'}" title="${rated?'Αξιολογήθηκε':'Δεν έχει αξιολογηθεί'}">${esc(t)}</span>`;
+  }).join('');
+
+  const detailsKey = 'evdet-'+stateKey;
+
+  // Read-only score chips per rated LLM (with each LLM's own date)
+  const chipsByLlm = ratedIdx.map(li => {
     const l = llms[li] || {};
+    const m = merged[li];
     const chips = CRITERIA.map(c => {
-      const val = perLlm[li].ratings && perLlm[li].ratings[c.id] ? perLlm[li].ratings[c.id] : '—';
+      const val = m.ratings && m.ratings[c.id] ? m.ratings[c.id] : '—';
       return `<span class="sc${mine?' mine':''}">${c.id}. ${esc(val)}</span>`;
     }).join('');
+    const dateLine = m.timestamp ? `<span class="eval-when" style="margin-left:6px;">${esc(m.timestamp)}${m.lastEdited?` · ✏ ${esc(m.lastEdited)}`:''}</span>` : '';
     return `
       <div class="llm-scores-group">
-        <div class="llm-scores-label"><span class="llm-mini-num">${li+1}</span>${esc(l.title||('LLM #'+(li+1)))}</div>
+        <div class="llm-scores-label"><span class="llm-mini-num">${li+1}</span>${esc(l.title||('LLM #'+(li+1)))}${dateLine}</div>
         <div class="scores-wrap">${chips}</div>
       </div>`;
   }).join('');
 
-  const mineBadge   = mine ? `<span class="eval-mine">Η αξιολόγησή μου</span>` : '';
-  const editedBadge = ev.lastEdited ? `<span class="eval-edited">✏ ${esc(ev.lastEdited)}</span>` : '';
-  const editBtn     = mine ? `<button class="btn sm" onclick="toggleEdit('${esc(stateKey)}')">✏ Επεξεργασία</button>` : '';
+  const missingIdx = llms.map((_,i)=>i).filter(i => !(i in merged));
+  const missingNote = missingIdx.length
+    ? `<div class="eval-missing-note">Δεν έχει αξιολογήσει: ${missingIdx.map(i=>esc(llms[i].title||('LLM #'+(i+1)))).join(', ')}</div>`
+    : '';
 
-  // Editable per-LLM criteria — only for rated LLM(s)
-  const editLlmHtml = mine ? showIdx.map(li => {
-    const l = llms[li] || {};
+  const summaryRow = `
+    <div class="eval-row-item">
+      <div class="eval-avatar">${ini(evaluatorName)}</div>
+      <div style="flex:1;min-width:0;">
+        <div class="eval-who">${esc(evaluatorName)} ${tags}${mineBadge}</div>
+        <div class="eval-when">${ratedIdx.length}/${llms.length} LLMs αξιολογημένα</div>
+      </div>
+      <button type="button" class="btn sm eval-more-btn" id="${esc(detailsKey)}-btn" onclick="toggleEvalDetails('${esc(detailsKey)}')">more ▾</button>
+    </div>
+    <div class="eval-details" id="${esc(detailsKey)}" style="display:none;">
+      ${chipsByLlm || '<div class="muted" style="font-size:12px;">—</div>'}
+      ${missingNote}
+      ${mine ? `<div style="margin-top:.6rem;"><button class="btn sm" onclick="toggleEdit('${esc(stateKey)}')">✏ Επεξεργασία / Συμπλήρωση</button></div>` : ''}
+    </div>`;
+
+  // EDIT FORM: ALL session LLMs side-by-side (rated preloaded, missing empty)
+  const editLlmCols = mine ? llms.map((l, li) => {
+    const rated = (li in merged);
     const critHtml = CRITERIA.map(c => {
       const selVal     = editState[stateKey].llms[li].ratings[c.id]  || null;
       const commentVal = editState[stateKey].llms[li].comments[c.id] || '';
@@ -416,40 +497,26 @@ function buildEvalRow(sessionCode, evalKey, ev, llms){
         </div>`;
     }).join('');
     return `
-      <div class="edit-llm-sec">
-        <div class="edit-llm-sec-title"><div class="edit-llm-sec-num">${li+1}</div>${esc(l.title||('LLM #'+(li+1)))}</div>
+      <div class="edit-llm-col${rated?'':' edit-llm-col-new'}">
+        <div class="edit-llm-sec-title"><div class="edit-llm-sec-num">${li+1}</div>${esc(l.title||('LLM #'+(li+1)))}${rated?'':' <span class="edit-new-badge">νέα</span>'}</div>
         ${critHtml}
       </div>`;
   }).join('') : '';
 
   const editFormHtml = mine ? `
     <div class="edit-form" id="ef-${esc(stateKey)}">
-      <div style="font-size:13px;font-weight:500;color:var(--blue-t);margin-bottom:1rem;">✏ Επεξεργασία αξιολόγησης — ${esc(ev.timestamp||'')}</div>
-      ${editLlmHtml}
+      <div style="font-size:13px;font-weight:500;color:var(--blue-t);margin-bottom:1rem;">✏ Επεξεργασία / Συμπλήρωση αξιολόγησης — ${esc(evaluatorName)}</div>
+      <div class="edit-llm-row">${editLlmCols}</div>
       <div id="ef-msg-${esc(stateKey)}"></div>
       <div class="btn-row">
         <button class="btn pri" style="background:var(--green);border-color:var(--green);"
-          onclick="saveEdit('${esc(sessionCode)}','${esc(evalKey)}','${esc(stateKey)}')">Αποθήκευση ✓</button>
+          onclick="saveEvaluatorEdit('${esc(sessionCode)}','${esc(stateKey)}')">Αποθήκευση ✓</button>
         <button class="btn" onclick="toggleEdit('${esc(stateKey)}')">Ακύρωση</button>
         <span id="ef-load-${esc(stateKey)}" style="display:none;font-size:13px;color:var(--muted);"><span class="spin"></span> Αποθήκευση...</span>
       </div>
     </div>` : '';
 
-  const detailsKey = 'evdet-'+stateKey;
-  return `
-    <div class="eval-row-item">
-      <div class="eval-avatar">${ini(ev.evaluator||'?')}</div>
-      <div style="flex:1;min-width:0;">
-        <div class="eval-who">${esc(ev.evaluator||'—')} ${llmTag}${mineBadge}${editedBadge}</div>
-        <div class="eval-when">${esc(ev.timestamp||'')}</div>
-      </div>
-      <button type="button" class="btn sm eval-more-btn" id="${esc(detailsKey)}-btn" onclick="toggleEvalDetails('${esc(detailsKey)}')">more ▾</button>
-    </div>
-    <div class="eval-details" id="${esc(detailsKey)}" style="display:none;">
-      ${chipsByLlm}
-      ${editBtn ? `<div style="margin-top:.5rem;">${editBtn}</div>` : ''}
-    </div>
-    ${editFormHtml}`;
+  return summaryRow + editFormHtml;
 }
 
 window.toggleEvalDetails = function(key){
@@ -491,11 +558,12 @@ window.pickCmt = function(sk, li, cid, val){
   editState[sk].llms[li].comments[cid] = val;
 };
 
-window.saveEdit = async function(sessionCode, evalKey, sk){
+window.saveEvaluatorEdit = async function(sessionCode, sk){
   const state = editState[sk]; if(!state) return;
   const llms = sessionLlmCache[sessionCode] || [];
   let valid=true, firstBad=null;
 
+  // Require all criteria for ALL LLMs (so missing ones get completed too)
   llms.forEach((l, li) => {
     CRITERIA.forEach(c=>{
       if(!state.llms[li] || !state.llms[li].ratings[c.id]){
@@ -513,9 +581,7 @@ window.saveEdit = async function(sessionCode, evalKey, sk){
 
   const ld=$('ef-load-'+sk); if(ld) ld.style.display='';
   try{
-    const origSnap=await db.ref('sessions/'+sessionCode+'/evaluations/'+evalKey+'/timestamp').get();
-    const origTs=origSnap.exists()?origSnap.val():now();
-
+    // Build a single consolidated record holding all LLMs for this evaluator.
     const llmsPayload={};
     llms.forEach((l, li) => {
       const ratings={}, comments={};
@@ -526,14 +592,43 @@ window.saveEdit = async function(sessionCode, evalKey, sk){
       llmsPayload[li] = { llmTitle:l.title||'', ratings, comments };
     });
 
-    await db.ref('sessions/'+sessionCode+'/evaluations/'+evalKey).set({
+    // Earliest original timestamp (if any) is preserved; else now().
+    const recordKeyForLlm = state.recordKeyForLlm || {};
+    const oldKeys = [...new Set(Object.values(recordKeyForLlm))];
+    let baseTs = now();
+    if(oldKeys.length){
+      try{
+        const snaps = await Promise.all(oldKeys.map(k =>
+          db.ref('sessions/'+sessionCode+'/evaluations/'+k+'/timestamp').get()));
+        const tss = snaps.filter(s=>s.exists()).map(s=>s.val());
+        if(tss.length) baseTs = tss[0];
+      }catch(e){}
+    }
+
+    const consolidated = {
       evaluator:      ME.displayName||ME.email,
       evaluatorEmail: ME.email,
       evaluatorUid:   ME.uid,
-      timestamp:      origTs,
+      timestamp:      baseTs,
       lastEdited:     now(),
       llms:           llmsPayload
-    });
+    };
+
+    // Reuse the first old key if present; otherwise push a new key.
+    let targetKey = oldKeys.length ? oldKeys[0] : null;
+    if(targetKey){
+      await db.ref('sessions/'+sessionCode+'/evaluations/'+targetKey).set(consolidated);
+    } else {
+      const ref = db.ref('sessions/'+sessionCode+'/evaluations').push();
+      targetKey = ref.key;
+      await ref.set(consolidated);
+    }
+
+    // Remove the evaluator's other (now-merged) records to avoid duplicates.
+    const removals = oldKeys.filter(k => k && k !== targetKey)
+      .map(k => db.ref('sessions/'+sessionCode+'/evaluations/'+k).remove());
+    if(removals.length) await Promise.all(removals);
+
     if(ld) ld.style.display='none';
     load();
   }catch(e){
