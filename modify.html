@@ -27,6 +27,10 @@
 .count-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 .count-row input{max-width:120px;}
 .warn-evals{font-size:11px;color:var(--amber-t);background:var(--amber-bg);border-radius:4px;padding:3px 9px;display:inline-block;}
+.ms-persona-group{margin-bottom:1.75rem;}
+.ms-persona-head{display:flex;align-items:baseline;gap:10px;margin:0 0 .75rem;padding-bottom:.5rem;border-bottom:1.5px solid var(--blue);}
+.ms-persona-name{font-size:17px;font-weight:600;color:var(--blue-t);}
+.ms-persona-count{font-size:12px;color:var(--muted);}
 </style>
 </head>
 <body>
@@ -138,7 +142,27 @@ async function load(){
       return;
     }
 
-    $('main-body').innerHTML = mine.map(([code, s]) => buildCard(code, s)).join('');
+    // Group sessions by personaTitle
+    const groups = {};
+    const order = [];
+    mine.forEach(([code, s]) => {
+      const key = (s.personaTitle || '— Χωρίς Persona —').trim();
+      if(!groups[key]){ groups[key] = []; order.push(key); }
+      groups[key].push([code, s]);
+    });
+    order.sort((a,b) => a.localeCompare(b, 'el'));
+
+    $('main-body').innerHTML = order.map(persona => {
+      const items = groups[persona];
+      return `
+        <div class="ms-persona-group">
+          <div class="ms-persona-head">
+            <span class="ms-persona-name">${esc(persona)}</span>
+            <span class="ms-persona-count">${items.length} ${items.length===1?'ερώτημα':'ερωτήματα'}</span>
+          </div>
+          ${items.map(([code, s]) => buildCard(code, s)).join('')}
+        </div>`;
+    }).join('');
   }catch(e){
     $('main-body').innerHTML=`<div class="notice n-err">Σφάλμα φόρτωσης: ${esc(e.message)}</div>`;
   }
