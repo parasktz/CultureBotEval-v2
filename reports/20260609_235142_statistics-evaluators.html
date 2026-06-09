@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>CultureBotEval — Evaluator Activity</title>
+<style>
+:root{--bg:#f4f3ee;--card:#fff;--border:rgba(0,0,0,.09);--text:#18180f;--muted:#68685f;--muted-2:#a8a89e;
+  --blue:#2b7fd4;--blue-bg:#e8f2fc;--blue-t:#0a3d6e;--r:10px;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);padding:2rem 1.25rem 4rem;}
+.wrap{max-width:1000px;margin:0 auto;}
+h1{font-size:22px;font-weight:500;margin-bottom:.3rem;}
+.subtitle{font-size:13px;color:var(--muted);margin-bottom:1.5rem;}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:1.5rem;}
+.card{background:var(--card);border:.5px solid var(--border);border-radius:var(--r);padding:.9rem 1.1rem;}
+.card-lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;}
+.card-val{font-size:26px;font-weight:500;color:var(--blue-t);}
+.ev-card{background:var(--card);border:.5px solid var(--border);border-radius:var(--r);margin-bottom:.75rem;overflow:hidden;}
+.ev-head{display:flex;align-items:center;gap:12px;padding:.85rem 1.1rem;cursor:pointer;}
+.ev-chevron{width:18px;height:18px;color:var(--muted);transition:transform .2s;flex-shrink:0;}
+.ev-card.open .ev-chevron{transform:rotate(90deg);}
+.ev-avatar{width:34px;height:34px;border-radius:50%;background:var(--blue-bg);color:var(--blue-t);
+           font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.ev-id{flex:1;min-width:0;}
+.ev-name{font-size:14px;font-weight:600;color:var(--text);}
+.ev-email{font-size:11px;color:var(--muted);}
+.ev-chips{display:flex;gap:5px;flex-wrap:wrap;}
+.ev-chip{font-size:11px;background:var(--bg);border:.5px solid var(--border);border-radius:999px;padding:2px 9px;color:var(--muted);}
+.ev-chip strong{color:var(--text);}
+.ev-body{max-height:0;overflow:hidden;transition:max-height .25s ease;}
+.ev-card.open .ev-body{max-height:2000px;}
+.ev-body-inner{padding:0 1.1rem 1.1rem;}
+.sub-h{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:.9rem 0 .5rem;}
+.llm-bar{display:flex;flex-wrap:wrap;gap:5px;}
+.llm-pill{font-size:11px;border-radius:4px;padding:2px 9px;color:#fff;display:inline-flex;align-items:center;gap:5px;}
+.llm-pill .n{background:rgba(255,255,255,.3);padding:0 6px;border-radius:999px;font-size:10px;font-weight:700;}
+.matrix-wrap{overflow-x:auto;}
+.matrix{border-collapse:collapse;font-size:12px;width:100%;}
+.matrix th,.matrix td{border:.5px solid var(--border);padding:5px 9px;text-align:center;}
+.matrix th{background:var(--bg);font-weight:600;font-size:11px;}
+.matrix th.q,.matrix td.q{text-align:left;max-width:340px;}
+.matrix .tot{font-weight:700;background:#fafaf7;}
+.llm-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;vertical-align:middle;}
+.cell-n{font-weight:600;}
+.cell-0{color:var(--muted-2);font-weight:400;}
+.empty{padding:3rem 1rem;text-align:center;color:var(--muted);}
+.gen-info{font-size:11px;color:var(--muted);margin-top:2rem;padding-top:1rem;border-top:.5px solid var(--border);font-family:monospace;}
+.controls{display:flex;justify-content:flex-end;margin-bottom:.75rem;}
+.controls select{padding:.4rem .6rem;border:.5px solid var(--border);border-radius:6px;font-size:12px;background:var(--card);}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>CultureBotEval — Evaluator Activity</h1>
+<div class="subtitle">9/6/2026 · snapshot</div>
+<div class="cards" id="cards"></div>
+<div class="controls">
+  <select id="sort-sel" onchange="renderList()">
+    <option value="total">Πλήθος αξιολογήσεων (φθίνουσα)</option>
+    <option value="queries">Πλήθος queries</option>
+    <option value="name">Όνομα (Α→Ω)</option>
+  </select>
+</div>
+<div id="ev-list"></div>
+<div class="gen-info">Generated: 2026-06-09T20:51:45.123Z · CultureBotEval Admin</div>
+</div>
+
+<script id="report-data" type="application/json">{"evList":[{"key":"QEtpJ82s7zXghSI8NWVzvAVOQky1","name":"ipapoutsi@iit.demokritos.gr","email":"ipapoutsi@iit.demokritos.gr","total":20,"byQuery":{"Give me examples of religious rituals that are dipicted in ancient greek vessels":1,"Can you give me a map or list of places that human remains are stored or displayed in Greece?":1,"Can you give me examples of objects that illustrate how young Athenians were educated.":3,"Give me examples of artifacts depicting Everyday Life in Classical-period Athens (5th–4th century BCE)":3,"Give me pictures of Children's Toys in Classical-period Athens (5th–4th century BCE)":1,"Give me a list of the most common musical instruments in ancient greece":3,"Can you give me examples of objects that are related to democratic prosesses in Ancient Athens during Archaic and Classical period":3,"Can you give me examples of Marble sculptures depicting mythological creatures from ancient Greece?":3,"I'm looking for athletic depictions in pottery and examples of athletic equipment from Classical Athens (5th–4th century BCE)":1,"Tell me which jewells were more common in Ancient Athens during the Classical period (5th–4th century BCE)":1},"byLlm":{"CultureBot v1":9,"Gemini":6,"ChatGPT":5},"matrix":{"Give me examples of religious rituals that are dipicted in ancient greek vessels":{"CultureBot v1":1},"Can you give me a map or list of places that human remains are stored or displayed in Greece?":{"Gemini":1},"Can you give me examples of objects that illustrate how young Athenians were educated.":{"CultureBot v1":1,"ChatGPT":1,"Gemini":1},"Give me examples of artifacts depicting Everyday Life in Classical-period Athens (5th–4th century BCE)":{"Gemini":1,"ChatGPT":1,"CultureBot v1":1},"Give me pictures of Children's Toys in Classical-period Athens (5th–4th century BCE)":{"CultureBot v1":1},"Give me a list of the most common musical instruments in ancient greece":{"ChatGPT":1,"Gemini":1,"CultureBot v1":1},"Can you give me examples of objects that are related to democratic prosesses in Ancient Athens during Archaic and Classical period":{"ChatGPT":1,"Gemini":1,"CultureBot v1":1},"Can you give me examples of Marble sculptures depicting mythological creatures from ancient Greece?":{"CultureBot v1":1,"ChatGPT":1,"Gemini":1},"I'm looking for athletic depictions in pottery and examples of athletic equipment from Classical Athens (5th–4th century BCE)":{"CultureBot v1":1},"Tell me which jewells were more common in Ancient Athens during the Classical period (5th–4th century BCE)":{"CultureBot v1":1}},"queries":["Give me examples of religious rituals that are dipicted in ancient greek vessels","Can you give me a map or list of places that human remains are stored or displayed in Greece?","Can you give me examples of objects that illustrate how young Athenians were educated.","Give me examples of artifacts depicting Everyday Life in Classical-period Athens (5th–4th century BCE)","Give me pictures of Children's Toys in Classical-period Athens (5th–4th century BCE)","Give me a list of the most common musical instruments in ancient greece","Can you give me examples of objects that are related to democratic prosesses in Ancient Athens during Archaic and Classical period","Can you give me examples of Marble sculptures depicting mythological creatures from ancient Greece?","I'm looking for athletic depictions in pottery and examples of athletic equipment from Classical Athens (5th–4th century BCE)","Tell me which jewells were more common in Ancient Athens during the Classical period (5th–4th century BCE)"],"llms":["CultureBot v1","Gemini","ChatGPT"]},{"key":"PKk2b99IkpYJ2koMHOAYy7CiCYG2","name":"parasktz@gmail.com","email":"parasktz@gmail.com","total":8,"byQuery":{"From which archaeological sites do the finds exhibited in the Archaeological Museum of Thessaloniki originate? I would also like to see some representative photographs (one object for each archaeological site).":3,"I am doing a project on the 1821 revolution and I want you to tell me what weapons the combatants used. I also want you to show me what these weapons looked like.":3,"Can you retrieve Greek cultural heritage objects with distinctive and harmonious colour palettes that could guide a new line of scarves or stationery?/ Βρες μου ελληνικά αντικείμενα πολιτιστικής κληρονομιάς με ιδιαίτερες ή αρμονικές χρωματικές παλέτες, που θα μπορούσαν να αποτελέσουν έμπνευση για μια νέα σειρά από αξεσουάρ, όπως μαντίλια ή είδη γραφικής ύλης;":1,"I want to see depictions of the Crucifixion from the post-Byzantine period.":1},"byLlm":{"CultureBot v1":3,"Gemini":2,"ChatGPT":3},"matrix":{"From which archaeological sites do the finds exhibited in the Archaeological Museum of Thessaloniki originate? I would also like to see some representative photographs (one object for each archaeological site).":{"CultureBot v1":1,"Gemini":1,"ChatGPT":1},"I am doing a project on the 1821 revolution and I want you to tell me what weapons the combatants used. I also want you to show me what these weapons looked like.":{"Gemini":1,"CultureBot v1":1,"ChatGPT":1},"Can you retrieve Greek cultural heritage objects with distinctive and harmonious colour palettes that could guide a new line of scarves or stationery?/ Βρες μου ελληνικά αντικείμενα πολιτιστικής κληρονομιάς με ιδιαίτερες ή αρμονικές χρωματικές παλέτες, που θα μπορούσαν να αποτελέσουν έμπνευση για μια νέα σειρά από αξεσουάρ, όπως μαντίλια ή είδη γραφικής ύλης;":{"CultureBot v1":1},"I want to see depictions of the Crucifixion from the post-Byzantine period.":{"ChatGPT":1}},"queries":["From which archaeological sites do the finds exhibited in the Archaeological Museum of Thessaloniki originate? I would also like to see some representative photographs (one object for each archaeological site).","I am doing a project on the 1821 revolution and I want you to tell me what weapons the combatants used. I also want you to show me what these weapons looked like.","Can you retrieve Greek cultural heritage objects with distinctive and harmonious colour palettes that could guide a new line of scarves or stationery?/ Βρες μου ελληνικά αντικείμενα πολιτιστικής κληρονομιάς με ιδιαίτερες ή αρμονικές χρωματικές παλέτες, που θα μπορούσαν να αποτελέσουν έμπνευση για μια νέα σειρά από αξεσουάρ, όπως μαντίλια ή είδη γραφικής ύλης;","I want to see depictions of the Crucifixion from the post-Byzantine period."],"llms":["CultureBot v1","Gemini","ChatGPT"]},{"key":"BVwOOzJKtJdMO1YGxFN1jOIvosy2","name":"angelaki@ekt.gr","email":"angelaki@ekt.gr","total":17,"byQuery":{"What are the most popular types of ancient Greek vases? Give me an illustrative photo for each of them.":1,"In class, we saw the crater of Derveni. What other findings come from this archaeological site? I want you to show me photos of them.":1,"I want you to find me depictions of the god Apollo.":2,"I want you to show me archaeological objects depicting scenes from Homer's epics.":3,"I want images - examples that show how the naked male body is depicted in Greek art from the Geometric period to the present day.":2,"I am doing a project on the 1821 revolution and I want you to tell me what weapons the combatants used. I also want you to show me what these weapons looked like.":3,"I am doing a school project and want to know what images are depicted on ancient coins.":3,"I am doing a school project and would like to know what images are depicted on ancient coins from the Greek colonies in southern Italy.":2},"byLlm":{"Gemini":6,"ChatGPT":6,"CultureBot v1":5},"matrix":{"What are the most popular types of ancient Greek vases? Give me an illustrative photo for each of them.":{"Gemini":1},"In class, we saw the crater of Derveni. What other findings come from this archaeological site? I want you to show me photos of them.":{"ChatGPT":1},"I want you to find me depictions of the god Apollo.":{"ChatGPT":1,"Gemini":1},"I want you to show me archaeological objects depicting scenes from Homer's epics.":{"Gemini":1,"CultureBot v1":1,"ChatGPT":1},"I want images - examples that show how the naked male body is depicted in Greek art from the Geometric period to the present day.":{"CultureBot v1":1,"Gemini":1},"I am doing a project on the 1821 revolution and I want you to tell me what weapons the combatants used. I also want you to show me what these weapons looked like.":{"CultureBot v1":1,"Gemini":1,"ChatGPT":1},"I am doing a school project and want to know what images are depicted on ancient coins.":{"ChatGPT":1,"Gemini":1,"CultureBot v1":1},"I am doing a school project and would like to know what images are depicted on ancient coins from the Greek colonies in southern Italy.":{"ChatGPT":1,"CultureBot v1":1}},"queries":["What are the most popular types of ancient Greek vases? Give me an illustrative photo for each of them.","In class, we saw the crater of Derveni. What other findings come from this archaeological site? I want you to show me photos of them.","I want you to find me depictions of the god Apollo.","I want you to show me archaeological objects depicting scenes from Homer's epics.","I want images - examples that show how the naked male body is depicted in Greek art from the Geometric period to the present day.","I am doing a project on the 1821 revolution and I want you to tell me what weapons the combatants used. I also want you to show me what these weapons looked like.","I am doing a school project and want to know what images are depicted on ancient coins.","I am doing a school project and would like to know what images are depicted on ancient coins from the Greek colonies in southern Italy."],"llms":["Gemini","ChatGPT","CultureBot v1"]},{"key":"fVYBr1gZBLNiCgjb1JHlbXeErgv2","name":"diagroupb32@gmail.com","email":"diagroupb32@gmail.com","total":1,"byQuery":{"I am doing a project on the 1821 revolution and I want you to tell me what weapons the combatants used. I also want you to show me what these weapons looked like.":1},"byLlm":{"Gemini":1},"matrix":{"I am doing a project on the 1821 revolution and I want you to tell me what weapons the combatants used. I also want you to show me what these weapons looked like.":{"Gemini":1}},"queries":["I am doing a project on the 1821 revolution and I want you to tell me what weapons the combatants used. I also want you to show me what these weapons looked like."],"llms":["Gemini"]},{"key":"Vz5yKukvIASpJp6riiGKZ3bHBvy2","name":"parasktz@gmail.com","email":"parasktz@gmail.com","total":6,"byQuery":{"I am doing a school project and would like to know what images are depicted on ancient coins from the Greek colonies in southern Italy.":3,"Can you give me examples of Marble sculptures depicting mythological creatures from ancient Greece?":3},"byLlm":{"ChatGPT":2,"Gemini":2,"CultureBot v1":2},"matrix":{"I am doing a school project and would like to know what images are depicted on ancient coins from the Greek colonies in southern Italy.":{"ChatGPT":1,"Gemini":1,"CultureBot v1":1},"Can you give me examples of Marble sculptures depicting mythological creatures from ancient Greece?":{"ChatGPT":1,"Gemini":1,"CultureBot v1":1}},"queries":["I am doing a school project and would like to know what images are depicted on ancient coins from the Greek colonies in southern Italy.","Can you give me examples of Marble sculptures depicting mythological creatures from ancient Greece?"],"llms":["ChatGPT","Gemini","CultureBot v1"]}],"summary":{"evaluators":5,"totalRatings":52,"queries":21,"llms":3},"colors":{"Gemini":"#4285f4","ChatGPT":"#10a37f","CultureBot v1":"#b14dd1"}}</script>
+<script>
+(function(){
+  const P = JSON.parse(document.getElementById('report-data').textContent);
+  const EVAL = P.evList, SUMMARY = P.summary, LLM_COLOR = P.colors;
+  function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+  function ini(n){return String(n||'?').trim().split(/\s+/).map(w=>w[0]).join('').substring(0,2).toUpperCase();}
+
+  document.getElementById('cards').innerHTML =
+    '<div class="card"><div class="card-lbl">Evaluators</div><div class="card-val">'+SUMMARY.evaluators+'</div></div>'+
+    '<div class="card"><div class="card-lbl">Σύνολο αξιολογήσεων</div><div class="card-val">'+SUMMARY.totalRatings+'</div></div>'+
+    '<div class="card"><div class="card-lbl">Queries</div><div class="card-val">'+SUMMARY.queries+'</div></div>'+
+    '<div class="card"><div class="card-lbl">LLMs</div><div class="card-val">'+SUMMARY.llms+'</div></div>';
+
+  window.renderList = function(){
+    const sortBy = document.getElementById('sort-sel').value;
+    let evs = EVAL.slice();
+    if(!evs.length){ document.getElementById('ev-list').innerHTML='<div class="empty">📭 Καμία αξιολόγηση ακόμη.</div>'; return; }
+    evs.sort((a,b)=>{
+      if(sortBy==='name') return a.name.localeCompare(b.name,'el');
+      if(sortBy==='queries') return b.queries.length-a.queries.length || b.total-a.total;
+      return b.total-a.total;
+    });
+    document.getElementById('ev-list').innerHTML = evs.map((e,idx)=>buildCard(e,idx)).join('');
+    document.querySelectorAll('.ev-head').forEach(h=>{ h.onclick=()=>h.parentElement.classList.toggle('open'); });
+  };
+
+  function buildCard(e,idx){
+    const llms = e.llms.slice().sort();
+    const llmPills = Object.entries(e.byLlm).sort((a,b)=>b[1]-a[1]).map(([llm,n])=>{
+      const c = LLM_COLOR[llm]||'#6b7280';
+      return '<span class="llm-pill" style="background:'+c+'">'+esc(llm)+'<span class="n">'+n+'</span></span>';
+    }).join('');
+    const queryList = Object.entries(e.byQuery).sort((a,b)=>b[1]-a[1]);
+    const cols = llms;
+    const head = '<tr><th class="q">Query</th>'+cols.map(l=>'<th><span class="llm-dot" style="background:'+(LLM_COLOR[l]||'#6b7280')+'"></span>'+esc(l)+'</th>').join('')+'<th class="tot">Σύνολο</th></tr>';
+    const rows = queryList.map(([q])=>{
+      const cells = cols.map(l=>{ const n=(e.matrix[q]&&e.matrix[q][l])||0; return '<td><span class="cell-n'+(n===0?' cell-0':'')+'">'+(n||'·')+'</span></td>'; }).join('');
+      const rowTot = cols.reduce((a,l)=>a+((e.matrix[q]&&e.matrix[q][l])||0),0);
+      return '<tr><td class="q">'+esc(q)+'</td>'+cells+'<td class="tot">'+rowTot+'</td></tr>';
+    }).join('');
+    const colTotals = cols.map(l=>'<td class="tot">'+(e.byLlm[l]||0)+'</td>').join('');
+    const footer = '<tr><td class="q tot">Σύνολο</td>'+colTotals+'<td class="tot">'+e.total+'</td></tr>';
+    return '<div class="ev-card'+(idx===0?' open':'')+'">'+
+      '<div class="ev-head">'+
+        '<svg class="ev-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>'+
+        '<div class="ev-avatar">'+ini(e.name)+'</div>'+
+        '<div class="ev-id"><div class="ev-name">'+esc(e.name)+'</div>'+(e.email?'<div class="ev-email">'+esc(e.email)+'</div>':'')+'</div>'+
+        '<div class="ev-chips">'+
+          '<span class="ev-chip"><strong>'+e.total+'</strong> αξιολογήσεις</span>'+
+          '<span class="ev-chip"><strong>'+e.queries.length+'</strong> queries</span>'+
+          '<span class="ev-chip"><strong>'+e.llms.length+'</strong> LLMs</span>'+
+        '</div>'+
+      '</div>'+
+      '<div class="ev-body"><div class="ev-body-inner">'+
+        '<div class="sub-h">Αξιολογήσεις ανά LLM</div><div class="llm-bar">'+llmPills+'</div>'+
+        '<div class="sub-h">Πίνακας: Query × LLM (πλήθος αξιολογήσεων)</div>'+
+        '<div class="matrix-wrap"><table class="matrix"><thead>'+head+'</thead><tbody>'+rows+footer+'</tbody></table></div>'+
+      '</div></div>'+
+    '</div>';
+  }
+
+  renderList();
+})();
+</script>
+</body>
+</html>
