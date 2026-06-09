@@ -28,6 +28,10 @@
 .llm-eval-body .mco{padding:3px 9px;border-radius:14px;font-size:11px;line-height:1.3;}
 .llm-eval-body .fi{font-size:11.5px;}
 .llm-eval-title{font-size:14px;}
+.clear-row{margin-top:.4rem;display:flex;justify-content:flex-end;}
+.btn-clear{font-size:11.5px;color:var(--muted);background:transparent;border:.5px solid var(--border2);
+  border-radius:6px;padding:4px 10px;cursor:pointer;font-family:inherit;transition:all .15s;}
+.btn-clear:hover{border-color:var(--red);color:var(--red);background:var(--card);}
 @media(max-width:900px){
   .llm-eval-row{flex-wrap:wrap;}
   .llm-eval-card{flex:1 1 calc(50% - .6rem);min-width:240px;}
@@ -176,6 +180,8 @@ const CRITERIA = [
 
 let LLMS = [];                /* normalized [{title,description}] */
 let state = {};               /* llmIndex -> { ratings:{}, comments:{} } */
+let PRELOAD = {};             /* llmIndex -> {ratings, comments} from existing records */
+let MY_OLD_KEYS = [];         /* existing eval record keys for current user (to consolidate) */
 const sessionCode = new URLSearchParams(location.search).get('session');
 
 function normalizeLlms(s){
@@ -221,6 +227,40 @@ async function loadSession(){
     const s = snap.val();
     LLMS = normalizeLlms(s);
 
+    // Edit/complete mode: preload THIS user's existing ratings for this session.
+    PRELOAD = {}; MY_OLD_KEYS = [];
+    const u = auth.currentUser;
+    const evs = s.evaluations;
+    if(u && evs && typeof evs === 'object'){
+      const titleToIdx = {};
+      LLMS.forEach((l,i)=>{ titleToIdx[(l.title||'').trim()] = i; });
+      Object.entries(evs).forEach(([key, rec])=>{
+        if(!rec || typeof rec !== 'object') return;
+        const mine = (rec.evaluatorUid && rec.evaluatorUid===u.uid) ||
+                     (rec.evaluatorEmail && rec.evaluatorEmail===u.email);
+        if(!mine) return;
+        MY_OLD_KEYS.push(key);
+        const blocks = Array.isArray(rec.llms) ? rec.llms.map((v,i)=>[i,v])
+                     : (rec.llms && typeof rec.llms==='object' ? Object.entries(rec.llms) : []);
+        blocks.forEach(([idx, blk])=>{
+          if(!blk || typeof blk!=='object') return;
+          let li = parseInt(idx,10);
+          const t = (blk.llmTitle||'').trim();
+          if(t && t in titleToIdx) li = titleToIdx[t];   // prefer title match
+          const ratings={}, comments={};
+          const rr = blk.ratings, cc = blk.comments;
+          for(let c=1;c<=10;c++){
+            const rv = Array.isArray(rr)? rr[c] : (rr && rr[c]);
+            const cv = Array.isArray(cc)? cc[c] : (cc && cc[c]);
+            if(rv) ratings[c]=rv;
+            if(cv) comments[c]=cv;
+          }
+          PRELOAD[li] = { ratings, comments };
+        });
+      });
+    }
+    const editMode = MY_OLD_KEYS.length>0;
+
     $('hdr-code').textContent     = `Session: ${sessionCode}`;
     $('f-creator').textContent    = s.creator      || '—';
     $('f-ptitle').textContent     = s.personaTitle || '—';
@@ -240,6 +280,10 @@ async function loadSession(){
     }
 
     buildLlmEvaluations();
+    if(editMode){
+      const t=document.querySelector('.hdr-title'); if(t) t.textContent='Επεξεργασία / Συμπλήρωση Αξιολόγησης';
+      const sb=$('ev-submit'); if(sb) sb.textContent='Αποθήκευση Αλλαγών ✓';
+    }
     $('loading').style.display = 'none';
     $('ev-area').style.display = 'block';
   }catch(e){
@@ -252,16 +296,21 @@ function buildLlmEvaluations(){
   const area = $('llm-eval-area');
 
   area.innerHTML = '<div class="llm-eval-row">' + LLMS.map((llm, li) => {
-    state[li] = { ratings:{}, comments:{} };
-    const critHtml = CRITERIA.map(c => `
+    const pre = PRELOAD[li] || {ratings:{}, comments:{}};
+    state[li] = { ratings:Object.assign({}, pre.ratings||{}), comments:Object.assign({}, pre.comments||{}) };
+    const critHtml = CRITERIA.map(c => {
+      const selVal = state[li].ratings[c.id] || null;
+      const cmtVal = state[li].comments[c.id] || '';
+      return `
       <div class="cc">
         <div class="ch"><div class="cn">${c.id}</div><div class="cname">${esc(c.name)}</div></div>
         <div class="mcg">
-          ${c.opts.map(o=>`<button class="mco" data-llm="${li}" data-c="${c.id}" data-v="${esc(o)}">${esc(o)}</button>`).join('')}
+          ${c.opts.map(o=>`<button class="mco${selVal===o?' sel':''}" data-llm="${li}" data-c="${c.id}" data-v="${esc(o)}">${esc(o)}</button>`).join('')}
         </div>
         <div style="font-size:11px;color:var(--red);display:none;" id="cerr-${li}-${c.id}">Επιλέξτε μια απάντηση</div>
-        <textarea class="fi" rows="2" placeholder="Σχόλια (προαιρετικά)..." data-cm-llm="${li}" data-cm="${c.id}" style="margin-top:5px;"></textarea>
-      </div>`).join('');
+        <textarea class="fi" rows="2" placeholder="Σχόλια (προαιρετικά)..." data-cm-llm="${li}" data-cm="${c.id}" style="margin-top:5px;">${esc(cmtVal)}</textarea>
+      </div>`;
+    }).join('');
 
     const desc   = llm.description || '';
     const fullD  = esc(desc) || '—';
@@ -287,6 +336,9 @@ function buildLlmEvaluations(){
         <div class="llm-eval-body">
           <div class="sec-title" style="border:none;padding:0;margin-bottom:.85rem;">Αξιολόγηση — 10 Κριτήρια</div>
           ${critHtml}
+          <div class="clear-row">
+            <button type="button" class="btn-clear" onclick="clearLlm(${li})">🧹 Καθαρισμός επιλογών</button>
+          </div>
         </div>
       </div>`;
   }).join('') + '</div>';
@@ -311,6 +363,18 @@ function buildLlmEvaluations(){
     });
   });
 }
+
+window.clearLlm = function(li){
+  if(!state[li]) return;
+  state[li].ratings = {};
+  state[li].comments = {};
+  // clear selected option buttons for this LLM
+  document.querySelectorAll(`.mco[data-llm="${li}"]`).forEach(b => b.classList.remove('sel','er'));
+  // clear comment textareas for this LLM
+  document.querySelectorAll(`[data-cm-llm="${li}"]`).forEach(ta => { ta.value=''; });
+  // hide any error messages for this LLM
+  CRITERIA.forEach(c => { const e=$(`cerr-${li}-${c.id}`); if(e) e.style.display='none'; });
+};
 
 $('ev-submit').addEventListener('click', async () => {
   setMsg('');
@@ -355,7 +419,22 @@ $('ev-submit').addEventListener('click', async () => {
   $('ev-load').style.display   = '';
 
   try{
-    await db.ref('sessions/'+sessionCode+'/evaluations').push(payload);
+    if(MY_OLD_KEYS.length){
+      // Edit/complete mode: write ONE consolidated record, remove the others.
+      const targetKey = MY_OLD_KEYS[0];
+      // preserve earliest original timestamp if available
+      try{
+        const tsSnap = await db.ref('sessions/'+sessionCode+'/evaluations/'+targetKey+'/timestamp').get();
+        if(tsSnap.exists()) payload.timestamp = tsSnap.val();
+      }catch(e){}
+      payload.lastEdited = now();
+      await db.ref('sessions/'+sessionCode+'/evaluations/'+targetKey).set(payload);
+      const removals = MY_OLD_KEYS.slice(1)
+        .map(k => db.ref('sessions/'+sessionCode+'/evaluations/'+k).remove());
+      if(removals.length) await Promise.all(removals);
+    } else {
+      await db.ref('sessions/'+sessionCode+'/evaluations').push(payload);
+    }
 
     $('done-cards').innerHTML = LLMS.map((llm, li) => `
       <div class="card">
