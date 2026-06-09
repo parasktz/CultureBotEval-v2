@@ -77,6 +77,25 @@ const now  = () => new Date().toLocaleString('el-GR',{day:'2-digit',month:'2-dig
 let ME = null;
 let editLlm = {};   /* code -> array of {title,description} (working copy) */
 
+/* Linked accounts: these uids belong to the same person (same email) and may
+   edit each other's sessions. */
+const LINKED_UID_GROUPS = [
+  ['PKk2b99IkpYJ2koMHOAYy7CiCYG2', 'Vz5yKukvIASpJp6riiGKZ3bHBvy2']
+];
+function linkedUids(uid){
+  for(const g of LINKED_UID_GROUPS){ if(g.includes(uid)) return g; }
+  return [uid];
+}
+/* True if the current user is allowed to edit session s */
+function canEdit(s){
+  if(!ME) return false;
+  const mine = linkedUids(ME.uid);
+  if(s.creatorUid && mine.includes(s.creatorUid)) return true;
+  if(s.creatorEmail && ME.email && s.creatorEmail === ME.email) return true;
+  if(s.creatorUid === ME.uid) return true;
+  return false;
+}
+
 /* Normalize any session to an LLM array (handles old single-LLM format) */
 function normalizeLlms(s){
   if(Array.isArray(s.llms)) return s.llms.filter(Boolean).map(x=>({title:x.title||'',description:x.description||''}));
@@ -109,9 +128,9 @@ async function load(){
     const all = snap.val();
     editLlm = {};
 
-    // Only sessions created by me
+    // Sessions I'm allowed to edit (mine, or from a linked account)
     const mine = Object.entries(all)
-      .filter(([,s]) => s.creatorUid === ME.uid || s.creatorEmail === ME.email)
+      .filter(([,s]) => canEdit(s))
       .sort(([,a],[,b]) => (b.createdAt||'').localeCompare(a.createdAt||''));
 
     if(mine.length === 0){
