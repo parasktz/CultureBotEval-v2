@@ -53,8 +53,8 @@
 <div class="page">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:8px;">
     <div>
-      <div style="font-size:18px;font-weight:500;">Τα Sessions μου</div>
-      <div style="font-size:13px;color:var(--muted);margin-top:2px;">Επεξεργάσου ή διέγραψε ό,τι δημιούργησες στο Create.</div>
+      <div style="font-size:18px;font-weight:500;" id="ms-page-title">Τα Sessions μου</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:2px;" id="ms-page-sub">Επεξεργάσου ή διέγραψε ό,τι δημιούργησες στο Create.</div>
     </div>
     <button class="btn sm" id="btn-refresh">↻ Ανανέωση</button>
   </div>
@@ -79,6 +79,7 @@ const esc  = s => { const d=document.createElement('div'); d.textContent=String(
 const now  = () => new Date().toLocaleString('el-GR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 
 let ME = null;
+let IS_ADMIN = false;
 let editLlm = {};   /* code -> array of {title,description} (working copy) */
 
 /* Linked accounts: these uids belong to the same person (same email) and may
@@ -93,6 +94,7 @@ function linkedUids(uid){
 /* True if the current user is allowed to edit session s */
 function canEdit(s){
   if(!ME) return false;
+  if(IS_ADMIN) return true;                 // admins can edit ALL sessions
   const mine = linkedUids(ME.uid);
   if(s.creatorUid && mine.includes(s.creatorUid)) return true;
   if(s.creatorEmail && ME.email && s.creatorEmail === ME.email) return true;
@@ -109,12 +111,16 @@ function normalizeLlms(s){
 }
 function evalCount(s){ return s.evaluations ? Object.keys(s.evaluations).length : 0; }
 
-auth.onAuthStateChanged(u => {
+auth.onAuthStateChanged(async u => {
   if(!u){ location.href='index.html'; return; }
   ME = u;
   const name = u.displayName || u.email;
   $('umail').textContent = u.email;
   $('av').textContent    = name.trim().split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+  try{
+    const adminSnap = await db.ref('admins/' + u.uid).get();
+    IS_ADMIN = adminSnap.exists() && !!adminSnap.val();
+  }catch(e){ IS_ADMIN = false; }
   load();
 });
 
@@ -131,6 +137,11 @@ async function load(){
     }
     const all = snap.val();
     editLlm = {};
+
+    if(IS_ADMIN){
+      const t=$('ms-page-title'); if(t) t.textContent='Όλα τα Sessions (Admin)';
+      const sub=$('ms-page-sub'); if(sub) sub.textContent='Ως admin μπορείς να επεξεργαστείς ή να διαγράψεις οποιοδήποτε session.';
+    }
 
     // Sessions I'm allowed to edit (mine, or from a linked account)
     const mine = Object.entries(all)
