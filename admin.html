@@ -363,7 +363,7 @@ let cfg    = loadCfgLocal();
 
 auth.onAuthStateChanged(async user => {
   if(user){
-    const admin = await isAdmin(user.uid);
+    const admin = await isAdmin(user.uid, user.email);
     if(admin){
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('app').style.display          = 'flex';
@@ -393,11 +393,26 @@ async function doLogout(){ await auth.signOut(); location.reload(); }
 function setErr(m){ document.getElementById('l-err').textContent = m; }
 
 /* ═══════════════════════════════════════════════
-   ADMIN CHECK — Firebase only
+   ADMIN CHECK — robust (linked accounts + fallback)
 ═══════════════════════════════════════════════ */
-async function isAdmin(uid){
-  const snap = await db.ref('admins/' + uid).once('value');
-  return snap.exists();
+const LINKED_UID_GROUPS = [
+  ['PKk2b99IkpYJ2koMHOAYy7CiCYG2', 'Vz5yKukvIASpJp6riiGKZ3bHBvy2']
+];
+const ADMIN_UIDS   = ['PKk2b99IkpYJ2koMHOAYy7CiCYG2', 'Vz5yKukvIASpJp6riiGKZ3bHBvy2'];
+const ADMIN_EMAILS = ['parasktz@gmail.com'];
+function linkedUids(uid){
+  for(const g of LINKED_UID_GROUPS){ if(g.includes(uid)) return g; }
+  return [uid];
+}
+async function isAdmin(uid, email){
+  const uids = linkedUids(uid);
+  // fast local fallback (covers shared-email accounts / blocked reads)
+  if(uids.some(x => ADMIN_UIDS.includes(x)) || (email && ADMIN_EMAILS.includes(email))) return true;
+  // authoritative DB check across linked uids
+  for(const u of uids){
+    try{ const snap = await db.ref('admins/' + u).once('value'); if(snap.exists() && !!snap.val()) return true; }catch(e){}
+  }
+  return false;
 }
 
 /* ═══════════════════════════════════════════════
