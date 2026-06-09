@@ -87,6 +87,11 @@ let editLlm = {};   /* code -> array of {title,description} (working copy) */
 const LINKED_UID_GROUPS = [
   ['PKk2b99IkpYJ2koMHOAYy7CiCYG2', 'Vz5yKukvIASpJp6riiGKZ3bHBvy2']
 ];
+/* Known admin uids/emails — used as a fallback if reading admins/<uid> is
+   blocked by security rules or the account uses a different uid. The
+   authoritative source remains the admins/ node in the database. */
+const ADMIN_UIDS   = ['PKk2b99IkpYJ2koMHOAYy7CiCYG2', 'Vz5yKukvIASpJp6riiGKZ3bHBvy2'];
+const ADMIN_EMAILS = ['parasktz@gmail.com'];
 function linkedUids(uid){
   for(const g of LINKED_UID_GROUPS){ if(g.includes(uid)) return g; }
   return [uid];
@@ -118,8 +123,24 @@ auth.onAuthStateChanged(async u => {
   $('umail').textContent = u.email;
   $('av').textContent    = name.trim().split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
   try{
-    const adminSnap = await db.ref('admins/' + u.uid).get();
-    IS_ADMIN = adminSnap.exists() && !!adminSnap.val();
+    // Admin if ANY linked account (same person) is in admins/, OR matches a
+    // known admin uid/email (fallback for shared-email accounts or blocked reads).
+    const uids = linkedUids(u.uid);
+    let isAdmin = false;
+    // fast local fallback
+    if(uids.some(x => ADMIN_UIDS.includes(x)) || (u.email && ADMIN_EMAILS.includes(u.email))){
+      isAdmin = true;
+    }
+    // authoritative DB check (any linked uid)
+    if(!isAdmin){
+      for(const uid of uids){
+        try{
+          const snap = await db.ref('admins/' + uid).get();
+          if(snap.exists() && !!snap.val()){ isAdmin = true; break; }
+        }catch(e){ /* ignore and try next */ }
+      }
+    }
+    IS_ADMIN = isAdmin;
   }catch(e){ IS_ADMIN = false; }
   load();
 });
