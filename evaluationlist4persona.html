@@ -474,49 +474,10 @@ function buildEvaluatorGroup(sessionCode, group, llms){
     <div class="eval-details" id="${esc(detailsKey)}" style="display:none;">
       ${chipsByLlm || '<div class="muted" style="font-size:12px;">—</div>'}
       ${missingNote}
-      ${mine ? `<div style="margin-top:.6rem;"><button class="btn sm" onclick="toggleEdit('${esc(stateKey)}')">✏ Επεξεργασία / Συμπλήρωση</button></div>` : ''}
+      ${mine ? `<div style="margin-top:.6rem;"><a class="btn sm" href="evaluation.html?session=${encodeURIComponent(sessionCode)}">✏ Επεξεργασία / Συμπλήρωση</a></div>` : ''}
     </div>`;
 
-  // EDIT FORM: ALL session LLMs side-by-side (rated preloaded, missing empty)
-  const editLlmCols = mine ? llms.map((l, li) => {
-    const rated = (li in merged);
-    const critHtml = CRITERIA.map(c => {
-      const selVal     = editState[stateKey].llms[li].ratings[c.id]  || null;
-      const commentVal = editState[stateKey].llms[li].comments[c.id] || '';
-      return `
-        <div class="ecc">
-          <div class="ech"><div class="ecn">${c.id}</div><div class="ecname">${esc(c.name)}</div></div>
-          <div class="emcg" id="mcg-${esc(stateKey)}-${li}-${c.id}">
-            ${c.opts.map(o=>`
-              <button class="emco${selVal===o?' sel':''}"
-                onclick="pickOpt('${esc(stateKey)}',${li},${c.id},'${esc(o)}')">${esc(o)}</button>`).join('')}
-          </div>
-          <div style="font-size:11px;color:var(--red);display:none;" id="merr-${esc(stateKey)}-${li}-${c.id}">Επιλέξτε</div>
-          <textarea class="fi" rows="2" placeholder="Σχόλια..." style="font-size:12px;margin-top:4px;"
-            onchange="pickCmt('${esc(stateKey)}',${li},${c.id},this.value)">${esc(commentVal)}</textarea>
-        </div>`;
-    }).join('');
-    return `
-      <div class="edit-llm-col${rated?'':' edit-llm-col-new'}">
-        <div class="edit-llm-sec-title"><div class="edit-llm-sec-num">${li+1}</div>${esc(l.title||('LLM #'+(li+1)))}${rated?'':' <span class="edit-new-badge">νέα</span>'}</div>
-        ${critHtml}
-      </div>`;
-  }).join('') : '';
-
-  const editFormHtml = mine ? `
-    <div class="edit-form" id="ef-${esc(stateKey)}">
-      <div style="font-size:13px;font-weight:500;color:var(--blue-t);margin-bottom:1rem;">✏ Επεξεργασία / Συμπλήρωση αξιολόγησης — ${esc(evaluatorName)}</div>
-      <div class="edit-llm-row">${editLlmCols}</div>
-      <div id="ef-msg-${esc(stateKey)}"></div>
-      <div class="btn-row">
-        <button class="btn pri" style="background:var(--green);border-color:var(--green);"
-          onclick="saveEvaluatorEdit('${esc(sessionCode)}','${esc(stateKey)}')">Αποθήκευση ✓</button>
-        <button class="btn" onclick="toggleEdit('${esc(stateKey)}')">Ακύρωση</button>
-        <span id="ef-load-${esc(stateKey)}" style="display:none;font-size:13px;color:var(--muted);"><span class="spin"></span> Αποθήκευση...</span>
-      </div>
-    </div>` : '';
-
-  return summaryRow + editFormHtml;
+  return summaryRow;
 }
 
 window.toggleEvalDetails = function(key){
