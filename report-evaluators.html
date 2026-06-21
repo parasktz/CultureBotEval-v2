@@ -128,12 +128,12 @@ table.matrix tbody tr:nth-child(even){background:rgba(0,0,0,.012);}
 <script>
 /* ── criteria & rating normalisation (same as statistics.html) ── */
 function normIndexed(x){
-  const out=new Array(11).fill(null);
-  if(Array.isArray(x)){ for(let i=1;i<=10&&i<x.length;i++) out[i]=(x[i]===''?null:(x[i]??null)); }
-  else if(x&&typeof x==='object'){ Object.entries(x).forEach(([k,v])=>{const i=parseInt(k,10);if(i>=1&&i<=10)out[i]=(v===''?null:v);}); }
+  const out=new Array(13).fill(null);
+  if(Array.isArray(x)){ for(let i=1;i<=12&&i<x.length;i++) out[i]=(x[i]===''?null:(x[i]??null)); }
+  else if(x&&typeof x==='object'){ Object.entries(x).forEach(([k,v])=>{const i=parseInt(k,10);if(i>=1&&i<=12)out[i]=(v===''?null:v);}); }
   return out;
 }
-function llmHasRatings(b){ if(!b||typeof b!=='object')return false; const r=normIndexed(b.ratings); for(let i=1;i<=10;i++){if(r[i])return true;} return false; }
+function llmHasRatings(b){ if(!b||typeof b!=='object')return false; const r=normIndexed(b.ratings); for(let i=1;i<=12;i++){if(r[i])return true;} return false; }
 function validLlmBlocks(rec){
   if(!rec||typeof rec.llms!=='object'||rec.llms===null) return [];
   return Object.values(rec.llms).filter(llmHasRatings)

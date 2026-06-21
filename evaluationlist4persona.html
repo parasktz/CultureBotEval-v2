@@ -165,7 +165,9 @@ const CRITERIA=[
   {id:7,  name:'Bias',                                    opts:['No Bias','Slight Bias','Moderate Bias','Significant Bias']},
   {id:8,  name:'Diversity',                               opts:['High','Moderate','Low','None']},
   {id:9,  name:'Completeness / Variety / Representative', opts:['Excellent','Good','Fair','Poor']},
-  {id:10, name:'Needed Logical Steps',                    opts:['All Present','Mostly Present','Partially Present','Missing']}
+  {id:10, name:'Needed Logical Steps',                    opts:['All Present','Mostly Present','Partially Present','Missing']},
+  {id:11, name:'Usefulness vs manual SearchCulture search',opts:['1 — Λιγότερο χρήσιμη','2 — Λίγο λιγότερο χρήσιμη','3 — Περίπου το ίδιο','4 — Πιο χρήσιμη','5 — Πολύ πιο χρήσιμη']},
+  {id:12, name:'Need for further manual search',           opts:['No, the answer is sufficient','Yes, only to verify details/sources','Yes, to find more examples/images','Yes, to complete the answer','Yes, I would search from scratch']}
 ];
 
 let ME = null;
@@ -402,8 +404,12 @@ function buildEvaluatorGroup(sessionCode, group, llms){
   const merged = {};               // li -> {ratings, comments, timestamp, lastEdited}
   const recordKeyForLlm = {};      // li -> original record key (for save/cleanup)
   const evaluatorName = ev0.evaluator || ev0.evaluatorEmail || '—';
+  let existingQueryEval = null;    // preserve per-query difficulty/time across edits
 
   recs.forEach(([key, ev]) => {
+    if(ev && ev.queryEval && typeof ev.queryEval === 'object' && !existingQueryEval){
+      existingQueryEval = ev.queryEval;
+    }
     const perLlm = evalLlmData(ev, llms);
     const rated  = ratedIndices(ev, llms);
     // Determine which session-LLM index each rated block belongs to (prefer llmTitle).
@@ -424,7 +430,7 @@ function buildEvaluatorGroup(sessionCode, group, llms){
   const ratedIdx = Object.keys(merged).map(Number).sort((a,b)=>a-b);
 
   // Build edit state covering ALL session LLMs (rated -> preloaded, others -> empty)
-  editState[stateKey] = { llms:{}, recordKeyForLlm, uid: group.uid };
+  editState[stateKey] = { llms:{}, recordKeyForLlm, uid: group.uid, queryEval: existingQueryEval };
   llms.forEach((l, li) => {
     const m = merged[li];
     editState[stateKey].llms[li] = {
@@ -598,6 +604,10 @@ window.saveEvaluatorEdit = async function(sessionCode, sk){
       lastEdited:     now(),
       llms:           llmsPayload
     };
+    // Preserve query-level evaluation (difficulty/time) captured at submit time.
+    if(state.queryEval && typeof state.queryEval === 'object'){
+      consolidated.queryEval = state.queryEval;
+    }
 
     // Reuse the first old key if present; otherwise push a new key.
     let targetKey = oldKeys.length ? oldKeys[0] : null;

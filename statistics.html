@@ -163,7 +163,9 @@ const CRITERIA = [
   {id:7,  name:'Bias',                                    opts:['No Bias','Slight Bias','Moderate Bias','Significant Bias']},
   {id:8,  name:'Diversity',                               opts:['High','Moderate','Low','None']},
   {id:9,  name:'Completeness / Variety / Representative', opts:['Excellent','Good','Fair','Poor']},
-  {id:10, name:'Needed Logical Steps',                    opts:['All Present','Mostly Present','Partially Present','Missing']}
+  {id:10, name:'Needed Logical Steps',                    opts:['All Present','Mostly Present','Partially Present','Missing']},
+  {id:11, name:'Usefulness vs manual SearchCulture search',opts:['1 — Λιγότερο χρήσιμη','2 — Λίγο λιγότερο χρήσιμη','3 — Περίπου το ίδιο','4 — Πιο χρήσιμη','5 — Πολύ πιο χρήσιμη']},
+  {id:12, name:'Need for further manual search',           opts:['No, the answer is sufficient','Yes, only to verify details/sources','Yes, to find more examples/images','Yes, to complete the answer','Yes, I would search from scratch']}
 ];
 
 const LLM_COLORS = ['#2b7fd4','#1f9d57','#b9770e','#7a4fd0','#d0457a','#0fa6a6','#888'];
@@ -171,13 +173,13 @@ const LLM_COLORS = ['#2b7fd4','#1f9d57','#b9770e','#7a4fd0','#d0457a','#0fa6a6',
 function esc(s){const d=document.createElement('div');d.textContent=(s==null?'':String(s));return d.innerHTML;}
 
 function normIndexed(x){
-  const out = new Array(11).fill(null);
+  const out = new Array(13).fill(null);
   if(Array.isArray(x)){
-    for(let i=1;i<=10 && i<x.length;i++) out[i] = (x[i]===''?null:(x[i] ?? null));
+    for(let i=1;i<=12 && i<x.length;i++) out[i] = (x[i]===''?null:(x[i] ?? null));
   } else if(x && typeof x === 'object'){
     Object.entries(x).forEach(([k,v])=>{
       const i = parseInt(k,10);
-      if(i>=1 && i<=10) out[i] = (v===''?null:v);
+      if(i>=1 && i<=12) out[i] = (v===''?null:v);
     });
   }
   return out;
@@ -186,7 +188,7 @@ function normIndexed(x){
 function llmHasRatings(llmBlock){
   if(!llmBlock || typeof llmBlock !== 'object') return false;
   const r = normIndexed(llmBlock.ratings);
-  for(let i=1;i<=10;i++){ if(r[i]) return true; }
+  for(let i=1;i<=12;i++){ if(r[i]) return true; }
   return false;
 }
 

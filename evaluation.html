@@ -130,6 +130,12 @@
       </div>
     </div>
 
+    <!-- Query-level evaluation (per session) -->
+    <div class="card" id="query-eval-card">
+      <div class="sec-title">Αξιολόγηση Query (manual SearchCulture)</div>
+      <div id="query-eval-grid"></div>
+    </div>
+
     <!-- Per-LLM evaluation blocks -->
     <div id="llm-eval-area"></div>
 
@@ -175,12 +181,28 @@ const CRITERIA = [
   {id:7,  name:'Bias',                                    opts:['No Bias','Slight Bias','Moderate Bias','Significant Bias']},
   {id:8,  name:'Diversity',                               opts:['High','Moderate','Low','None']},
   {id:9,  name:'Completeness / Variety / Representative', opts:['Excellent','Good','Fair','Poor']},
-  {id:10, name:'Needed Logical Steps',                    opts:['All Present','Mostly Present','Partially Present','Missing']}
+  {id:10, name:'Needed Logical Steps',                    opts:['All Present','Mostly Present','Partially Present','Missing']},
+  {id:11, name:'Usefulness vs manual SearchCulture search',opts:['1 — Λιγότερο χρήσιμη','2 — Λίγο λιγότερο χρήσιμη','3 — Περίπου το ίδιο','4 — Πιο χρήσιμη','5 — Πολύ πιο χρήσιμη']},
+  {id:12, name:'Need for further manual search',           opts:['No, the answer is sufficient','Yes, only to verify details/sources','Yes, to find more examples/images','Yes, to complete the answer','Yes, I would search from scratch']}
+];
+
+const CRIT_COUNT = CRITERIA.length;  /* number of per-LLM criteria (was hardcoded 10) */
+
+/* Query-level questions (per session, not per LLM). #1 = 1–5 scale, #2 = free numeric minutes. */
+const QUERY_Q = [
+  {id:'difficulty', name:'Estimated manual search difficulty',
+   sub:'Πόσο δύσκολο θα ήταν να απαντηθεί το query μέσω απλής αναζήτησης στο SearchCulture.',
+   type:'scale', opts:['1 — Πολύ εύκολο','2 — Σχετικά εύκολο','3 — Μέτρια δυσκολία','4 — Δύσκολο','5 — Πολύ δύσκολο']},
+  {id:'time', name:'Estimated manual search time',
+   sub:'Πόσο χρόνο εκτιμάς ότι θα έπαιρνε χειροκίνητα μέσω SearchCulture (σε λεπτά).',
+   type:'number'}
 ];
 
 let LLMS = [];                /* normalized [{title,description}] */
 let state = {};               /* llmIndex -> { ratings:{}, comments:{} } */
+let qState = {};              /* query-level answers: {difficulty, time} */
 let PRELOAD = {};             /* llmIndex -> {ratings, comments} from existing records */
+let PRELOAD_Q = {};           /* query-level answers from existing record */
 let MY_OLD_KEYS = [];         /* existing eval record keys for current user (to consolidate) */
 const sessionCode = new URLSearchParams(location.search).get('session');
 
@@ -228,7 +250,7 @@ async function loadSession(){
     LLMS = normalizeLlms(s);
 
     // Edit/complete mode: preload THIS user's existing ratings for this session.
-    PRELOAD = {}; MY_OLD_KEYS = [];
+    PRELOAD = {}; PRELOAD_Q = {}; MY_OLD_KEYS = [];
     const u = auth.currentUser;
     const evs = s.evaluations;
     if(u && evs && typeof evs === 'object'){
@@ -240,6 +262,11 @@ async function loadSession(){
                      (rec.evaluatorEmail && rec.evaluatorEmail===u.email);
         if(!mine) return;
         MY_OLD_KEYS.push(key);
+        if(rec.queryEval && typeof rec.queryEval==='object'){
+          if(rec.queryEval.difficulty)    PRELOAD_Q.difficulty = rec.queryEval.difficulty;
+          if(rec.queryEval.searchMinutes != null && rec.queryEval.searchMinutes !== '')
+            PRELOAD_Q.time = rec.queryEval.searchMinutes;
+        }
         const blocks = Array.isArray(rec.llms) ? rec.llms.map((v,i)=>[i,v])
                      : (rec.llms && typeof rec.llms==='object' ? Object.entries(rec.llms) : []);
         blocks.forEach(([idx, blk])=>{
@@ -249,7 +276,7 @@ async function loadSession(){
           if(t && t in titleToIdx) li = titleToIdx[t];   // prefer title match
           const ratings={}, comments={};
           const rr = blk.ratings, cc = blk.comments;
-          for(let c=1;c<=10;c++){
+          for(let c=1;c<=CRIT_COUNT;c++){
             const rv = Array.isArray(rr)? rr[c] : (rr && rr[c]);
             const cv = Array.isArray(cc)? cc[c] : (cc && cc[c]);
             if(rv) ratings[c]=rv;
@@ -279,6 +306,7 @@ async function loadSession(){
       $('f-guide-row').style.display = '';
     }
 
+    buildQueryEval();
     buildLlmEvaluations();
     if(editMode){
       const t=document.querySelector('.hdr-title'); if(t) t.textContent='Επεξεργασία / Συμπλήρωση Αξιολόγησης';
@@ -289,6 +317,48 @@ async function loadSession(){
   }catch(e){
     $('loading').innerHTML = `<div class="notice n-err">Σφάλμα φόρτωσης: ${esc(e.message)}</div>`;
   }
+}
+
+function buildQueryEval(){
+  qState = { difficulty: PRELOAD_Q.difficulty || null, time: (PRELOAD_Q.time != null ? PRELOAD_Q.time : '') };
+  $('query-eval-grid').innerHTML = QUERY_Q.map(q => {
+    if(q.type === 'scale'){
+      const sel = qState[q.id];
+      return `
+        <div class="cc">
+          <div class="ch"><div class="cname">${esc(q.name)}</div></div>
+          <div style="font-size:12px;color:var(--muted);margin:-2px 0 7px;">${esc(q.sub)}</div>
+          <div class="mcg">
+            ${q.opts.map(o=>`<button class="mco${sel===o?' sel':''}" data-q="${q.id}" data-v="${esc(o)}">${esc(o)}</button>`).join('')}
+          </div>
+          <div style="font-size:11px;color:var(--red);display:none;" id="qerr-${q.id}">Επιλέξτε μια απάντηση</div>
+        </div>`;
+    }
+    return `
+      <div class="cc">
+        <div class="ch"><div class="cname">${esc(q.name)}</div></div>
+        <div style="font-size:12px;color:var(--muted);margin:-2px 0 7px;">${esc(q.sub)}</div>
+        <input type="number" class="fi" min="0" step="1" placeholder="π.χ. 5" data-qn="${q.id}" value="${esc(qState[q.id])}" style="max-width:140px;"/>
+        <span style="font-size:12px;color:var(--muted);margin-left:6px;">λεπτά</span>
+        <div style="font-size:11px;color:var(--red);display:none;" id="qerr-${q.id}">Συμπληρώστε έναν αριθμό</div>
+      </div>`;
+  }).join('');
+
+  document.querySelectorAll('.mco[data-q]').forEach(b => {
+    b.addEventListener('click', () => {
+      const qid = b.dataset.q;
+      qState[qid] = b.dataset.v;
+      document.querySelectorAll(`.mco[data-q="${qid}"]`).forEach(x => x.classList.remove('sel','er'));
+      b.classList.add('sel');
+      const e=$('qerr-'+qid); if(e) e.style.display='none';
+    });
+  });
+  document.querySelectorAll('[data-qn]').forEach(inp => {
+    inp.addEventListener('input', e => {
+      qState[e.target.dataset.qn] = e.target.value;
+      if(e.target.value){ const el=$('qerr-'+e.target.dataset.qn); if(el) el.style.display='none'; }
+    });
+  });
 }
 
 function buildLlmEvaluations(){
@@ -381,6 +451,20 @@ $('ev-submit').addEventListener('click', async () => {
   let valid = true;
   let firstBad = null;
 
+  // Query-level questions
+  QUERY_Q.forEach(q => {
+    const v = qState[q.id];
+    const empty = (v === undefined || v === null || String(v).trim() === '');
+    if(empty){
+      const e = $(`qerr-${q.id}`); if(e) e.style.display='block';
+      if(q.type === 'scale'){
+        document.querySelectorAll(`.mco[data-q="${q.id}"]`).forEach(b => b.classList.add('er'));
+      }
+      valid = false;
+      if(!firstBad) firstBad = $(`qerr-${q.id}`);
+    }
+  });
+
   LLMS.forEach((llm, li) => {
     CRITERIA.forEach(c => {
       if(!state[li].ratings[c.id]){
@@ -393,7 +477,7 @@ $('ev-submit').addEventListener('click', async () => {
   });
 
   if(!valid){
-    setMsg('Συμπλήρωσε όλα τα κριτήρια για όλα τα LLMs.');
+    setMsg('Συμπλήρωσε τις ερωτήσεις του query και όλα τα κριτήρια για όλα τα LLMs.');
     if(firstBad) firstBad.scrollIntoView({behavior:'smooth',block:'center'});
     return;
   }
@@ -404,6 +488,10 @@ $('ev-submit').addEventListener('click', async () => {
     evaluatorEmail: u.email,
     evaluatorUid:   u.uid,
     timestamp:      now(),
+    queryEval:      {
+      difficulty:    qState.difficulty || '',
+      searchMinutes: (qState.time != null ? String(qState.time).trim() : '')
+    },
     llms:           {}
   };
   LLMS.forEach((llm, li) => {
@@ -436,7 +524,21 @@ $('ev-submit').addEventListener('click', async () => {
       await db.ref('sessions/'+sessionCode+'/evaluations').push(payload);
     }
 
-    $('done-cards').innerHTML = LLMS.map((llm, li) => `
+    const qDoneCard = `
+      <div class="card">
+        <div class="sec-title">Αξιολόγηση Query — Περίληψη</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <div style="background:var(--bg);border-radius:6px;padding:7px 10px;">
+            <div style="font-size:10px;color:var(--muted);margin-bottom:1px;">Estimated manual search difficulty</div>
+            <div style="font-size:12px;font-weight:500;">${esc(qState.difficulty||'—')}</div>
+          </div>
+          <div style="background:var(--bg);border-radius:6px;padding:7px 10px;">
+            <div style="font-size:10px;color:var(--muted);margin-bottom:1px;">Estimated manual search time (min)</div>
+            <div style="font-size:12px;font-weight:500;">${esc((qState.time!=null&&String(qState.time).trim()!=='')?qState.time:'—')}</div>
+          </div>
+        </div>
+      </div>`;
+    $('done-cards').innerHTML = qDoneCard + LLMS.map((llm, li) => `
       <div class="card">
         <div class="sec-title">${esc(llm.title||('LLM #'+(li+1)))} — Περίληψη βαθμολογιών</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">

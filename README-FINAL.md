@@ -12,8 +12,8 @@ CultureBotEval/
 ├── modify.html                     # Modify — επεξεργασία/διαγραφή sessions  [ΝΕΟ]
 ├── evaluator.html                  # Evaluation — λίστα Personas  [ΕΝΗΜΕΡΩΘΗΚΕ: rename]
 ├── evaluationlist4persona.html     # Sessions ανά Persona — multi-LLM εμφάνιση & inline edit  [ΕΝΗΜΕΡΩΘΗΚΕ]
-├── evaluation.html                 # Νέα αξιολόγηση — όλα τα LLMs + 10 κριτήρια/LLM  [ΕΝΗΜΕΡΩΘΗΚΕ]
-├── statistics.html                 # Landing reports (κείμενο 10 κριτήρια)  [ΕΝΗΜΕΡΩΘΗΚΕ]
+├── evaluation.html                 # Νέα αξιολόγηση — όλα τα LLMs + 12 κριτήρια/LLM + 2 ερωτήσεις query-level  [ΕΝΗΜΕΡΩΘΗΚΕ]
+├── statistics.html                 # Landing reports (κείμενο 12 κριτήρια)  [ΕΝΗΜΕΡΩΘΗΚΕ]
 ├── report-sessions.html            # iframe loader (αμετάβλητο)
 ├── report-criteria.html            # iframe loader (αμετάβλητο)
 ├── admin.html                      # buildFile1/buildFile2 multi-LLM aware  [ΕΝΗΜΕΡΩΘΗΚΕ]
