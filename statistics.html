@@ -87,6 +87,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 .t1-ev{background:#eef1f4;color:#334;}
 .t1-n{background:rgba(0,0,0,.12);padding:0 6px;border-radius:999px;font-size:10px;font-weight:700;min-width:14px;text-align:center;line-height:1.5;}
 .t1-none{font-size:11px;color:var(--muted-2,#a8a89e);}
+.t1-llm-unrated{background:repeating-linear-gradient(45deg,#fbeaea,#fbeaea 6px,#f7dede 6px,#f7dede 12px);
+                color:#b14d4d;border-color:#e8b4b4;font-style:italic;}
+.t1-llm-unrated .t1-n{background:rgba(177,77,77,.18);color:#b14d4d;}
+.t2-unrated{color:#b14d4d;font-style:italic;}
 
 .qsel{margin-bottom:1.25rem;}
 .qsel label{font-size:12px;color:var(--muted);display:block;margin-bottom:.35rem;}
@@ -200,6 +204,22 @@ function validLlmBlocks(rec){
                  ratings: normIndexed(l.ratings) }));
 }
 
+/* All LLM titles defined in a SESSION (independent of whether anyone rated them).
+   Used so every model — including unrated ones like CultureBot v2 — always appears. */
+function sessionLlmTitles(s){
+  if(!s) return [];
+  let arr = s.llms;
+  if(arr && !Array.isArray(arr) && typeof arr==='object') arr = Object.values(arr);
+  if(!Array.isArray(arr)) return [];
+  const out = [];
+  arr.forEach(l=>{
+    if(!l || typeof l!=='object') return;
+    const t = (l.title || l.llmTitle || 'Untitled LLM').toString().trim() || 'Untitled LLM';
+    if(!out.includes(t)) out.push(t);
+  });
+  return out;
+}
+
 function forEachEvaluation(sessions, cb){
   Object.entries(sessions).forEach(([code,s])=>{
     if(!s || typeof s !== 'object') return;
@@ -301,6 +321,22 @@ function buildTab1(){
   const evNameById = {};
   let totalResponses = 0, totalRecords = 0;
 
+  // 1) Seed every persona/query with the FULL LLM roster from the session
+  //    so unrated models (e.g. CultureBot v2) always appear with a 0 count.
+  Object.entries(SESSIONS).forEach(([code, s])=>{
+    if(!s || typeof s!=='object') return;
+    const titles = sessionLlmTitles(s);
+    if(!titles.length) return;
+    const persona = s.personaTitle || 'Unknown persona';
+    const query   = s.query || '(no query)';
+    if(!byPersona[persona]) byPersona[persona] = {queries:{}, evaluators:new Set()};
+    if(!byPersona[persona].queries[query])
+      byPersona[persona].queries[query] = {responses:0, evaluators:new Set(), records:0, byLlm:{}, byEval:{}, allLlms:new Set()};
+    const qd = byPersona[persona].queries[query];
+    titles.forEach(t=>{ qd.allLlms.add(t); if(!(t in qd.byLlm)) qd.byLlm[t] = 0; });
+  });
+
+  // 2) Count actual ratings on top of the seeded roster
   forEachEvaluation(SESSIONS, (s, rec)=>{
     const blocks = validLlmBlocks(rec);
     if(!blocks.length) return;
@@ -310,7 +346,7 @@ function buildTab1(){
     if(!evNameById[evId]) evNameById[evId] = rec.evaluator || rec.evaluatorEmail || evId;
 
     if(!byPersona[persona]) byPersona[persona] = {queries:{}, evaluators:new Set()};
-    if(!byPersona[persona].queries[query]) byPersona[persona].queries[query] = {responses:0, evaluators:new Set(), records:0, byLlm:{}, byEval:{}};
+    if(!byPersona[persona].queries[query]) byPersona[persona].queries[query] = {responses:0, evaluators:new Set(), records:0, byLlm:{}, byEval:{}, allLlms:new Set()};
     const qd = byPersona[persona].queries[query];
 
     qd.responses += blocks.length;
@@ -322,7 +358,7 @@ function buildTab1(){
     totalRecords   += 1;
 
     // per-LLM-title responses
-    blocks.forEach(b=>{ qd.byLlm[b.title] = (qd.byLlm[b.title]||0) + 1; });
+    blocks.forEach(b=>{ qd.byLlm[b.title] = (qd.byLlm[b.title]||0) + 1; qd.allLlms.add(b.title); });
     // per-evaluator responses (this record contributes blocks.length responses)
     qd.byEval[evId] = (qd.byEval[evId]||0) + blocks.length;
   });
@@ -349,9 +385,17 @@ function buildTab1(){
     const rows = qNames.map((q,i)=>{
       const qd = data.queries[q];
       const llmEntries = Object.entries(qd.byLlm).sort((a,b)=>b[1]-a[1]);
+      const ratedCount = llmEntries.filter(([,n])=>n>0).length;
+      const totalLlmCount = llmEntries.length;
       const evEntries  = Object.entries(qd.byEval).sort((a,b)=>b[1]-a[1]);
-      const llmChips = llmEntries.map(([t,n])=>`<span class="t1-chip t1-llm">${esc(t)}<span class="t1-n">${n}</span></span>`).join('') || '<span class="t1-none">—</span>';
+      const llmChips = llmEntries.map(([t,n])=>
+        n>0 ? `<span class="t1-chip t1-llm">${esc(t)}<span class="t1-n">${n}</span></span>`
+            : `<span class="t1-chip t1-llm t1-llm-unrated" title="No ratings yet">${esc(t)}<span class="t1-n">0</span></span>`
+      ).join('') || '<span class="t1-none">—</span>';
       const evChips  = evEntries.map(([id,n])=>`<span class="t1-chip t1-ev" title="${esc(evNameById[id]||id)}">${esc(evNameById[id]||id)}<span class="t1-n">${n}</span></span>`).join('') || '<span class="t1-none">—</span>';
+      const coverageBadge = (totalLlmCount>0)
+        ? `<span class="metric"><strong>${ratedCount}/${totalLlmCount}</strong> LLM${totalLlmCount!==1?'s':''} rated</span>`
+        : '';
       return `
       <div class="q-row">
         <div class="q-idx">${i+1}</div>
@@ -360,7 +404,7 @@ function buildTab1(){
           <div class="q-metrics">
             <span class="metric"><strong>${qd.evaluators.size}</strong> unique evaluator${qd.evaluators.size!==1?'s':''}</span>
             <span class="metric"><strong>${qd.responses}</strong> response${qd.responses!==1?'s':''}</span>
-            <span class="metric"><strong>${llmEntries.length}</strong> LLM${llmEntries.length!==1?'s':''}</span>
+            ${coverageBadge}
             <span class="metric"><strong>${qd.records}</strong> record${qd.records!==1?'s':''}</span>
           </div>
           <div class="t1-sub"><span class="t1-sub-lbl">Responses per LLM</span><div class="t1-chips">${llmChips}</div></div>
@@ -388,8 +432,10 @@ let charts = [];
 
 function buildTab2Selector(){
   const queries = {};
-  forEachEvaluation(SESSIONS, (s, rec)=>{
-    if(!validLlmBlocks(rec).length) return;
+  // Use sessions directly so a query appears even if v2 (or any model) is unrated.
+  Object.values(SESSIONS).forEach(s=>{
+    if(!s || typeof s!=='object') return;
+    if(!sessionLlmTitles(s).length) return;
     const q = s.query || '(no query)';
     if(!(q in queries)) queries[q] = s.personaTitle || 'Unknown persona';
   });
@@ -416,6 +462,15 @@ function renderCriteria(){
   const dist = {};
   CRITERIA.forEach(c=>dist[c.id]={});
   const evaluatorSet = new Set();
+  const ratedLlms = new Set();
+
+  // Seed the LLM roster from the SESSION(s) for this query so every model
+  // (including unrated ones like CultureBot v2) shows as a series.
+  Object.values(SESSIONS).forEach(s=>{
+    if(!s || typeof s!=='object') return;
+    if((s.query || '(no query)') !== query) return;
+    sessionLlmTitles(s).forEach(t=>llmSet.add(t));
+  });
 
   forEachEvaluation(SESSIONS, (s, rec)=>{
     if((s.query || '(no query)') !== query) return;
@@ -425,6 +480,7 @@ function renderCriteria(){
     }
     blocks.forEach(block=>{
       llmSet.add(block.title);
+      ratedLlms.add(block.title);
       CRITERIA.forEach(c=>{
         const val = block.ratings[c.id];
         if(!val) return;
@@ -438,12 +494,24 @@ function renderCriteria(){
   const body = document.getElementById('t2-body');
 
   if(!llms.length){
-    body.innerHTML = '<div class="empty">No ratings found for this query.</div>';
+    body.innerHTML = '<div class="empty">No LLMs defined for this query.</div>';
+    return;
+  }
+
+  const llmListHtml = llms.map(l =>
+    ratedLlms.has(l) ? esc(l) : `<span class="t2-unrated">${esc(l)} (0 ratings)</span>`
+  ).join(', ');
+  const ratedN = llms.filter(l=>ratedLlms.has(l)).length;
+  const personaTag =
+    `<div class="persona-tag">Persona: <strong>${esc(persona)}</strong> · <strong>${evaluatorSet.size}</strong> evaluator${evaluatorSet.size!==1?'s':''} · <strong>${ratedN}/${llms.length}</strong> LLMs rated · LLMs: ${llmListHtml}</div>`;
+
+  if(!ratedLlms.size){
+    body.innerHTML = personaTag + '<div class="empty">No ratings submitted yet for this query. The LLMs above (including CultureBot v2) still need evaluation.</div>';
     return;
   }
 
   body.innerHTML =
-    `<div class="persona-tag">Persona: <strong>${esc(persona)}</strong> · <strong>${evaluatorSet.size}</strong> evaluator${evaluatorSet.size!==1?'s':''} · LLMs: ${llms.map(esc).join(', ')}</div>` +
+    personaTag +
     CRITERIA.map(c=>`
       <div class="crit-block">
         <div class="crit-head">${c.id}. ${esc(c.name)}</div>
@@ -454,7 +522,7 @@ function renderCriteria(){
   if(typeof Chart === 'undefined'){
     // Chart.js failed to load (offline/CDN blocked). Show data as text fallback.
     body.innerHTML =
-      `<div class="persona-tag">Persona: <strong>${esc(persona)}</strong> · <strong>${evaluatorSet.size}</strong> evaluator${evaluatorSet.size!==1?'s':''} · LLMs: ${llms.map(esc).join(', ')}</div>` +
+      personaTag +
       `<div class="empty">Δεν ήταν δυνατή η φόρτωση των γραφημάτων (Chart.js). Δοκιμάστε ανανέωση.</div>`;
     return;
   }
