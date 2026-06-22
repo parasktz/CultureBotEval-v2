@@ -96,6 +96,7 @@ table.matrix tbody tr:nth-child(even){background:rgba(0,0,0,.012);}
 .pmiss-bar{display:flex;flex-wrap:wrap;gap:6px;margin:.2rem 0 .4rem;}
 .pmiss{font-size:11.5px;border-radius:6px;padding:3px 10px;border:.5px solid var(--border);}
 .pmiss-some{background:#fbeaea;color:#b14d4d;border-color:#e8b4b4;}
+.pmiss-zero{background:#f3f0f0;color:#9a6b6b;border-color:#ddd0d0;border-style:dashed;}
 .pmiss-none{background:#e7f6ec;color:#2e7d46;border-color:#b6dfc4;}
 .pmiss-frac{opacity:.75;font-size:10.5px;margin-left:2px;}
 .ev-chip-warn{background:#fbeaea!important;color:#b14d4d!important;border-color:#e8b4b4!important;}
@@ -346,11 +347,13 @@ function buildCard(e,idx){
   const queryPersona=GLOBAL.queryPersona||{};
   const queryRoster=GLOBAL.queryRoster||{};
 
-  // Personas to display = personas the evaluator has touched.
+  // Personas the evaluator has touched (used for the detailed matrix below).
   const personas=[...(e.personas||new Set())].sort((a,b)=>a.localeCompare(b,'el'));
 
-  // Per-persona missing-evaluation summary (over the FULL persona roster).
-  const personaSummary=personas.map(p=>{
+  // Per-persona missing-evaluation summary over ALL personas in the project,
+  // so personas the evaluator hasn't started yet also appear (fully missing).
+  const allPersonas=Object.keys(personaQueries).sort((a,b)=>a.localeCompare(b,'el'));
+  const personaSummary=allPersonas.map(p=>{
     const qs=[...(personaQueries[p]||new Set())];
     let expected=0, done=0;
     qs.forEach(q=>{
@@ -361,10 +364,12 @@ function buildCard(e,idx){
       });
     });
     const missing=expected-done;
-    const cls=missing>0?'pmiss-some':'pmiss-none';
+    const started=done>0;
+    const cls=missing===0 ? 'pmiss-none' : (started ? 'pmiss-some' : 'pmiss-zero');
+    const tag=missing===0 ? '' : (started ? '' : ' · not started');
     return `<span class="pmiss ${cls}" title="${done} of ${expected} evaluated">
               ${esc(p)}: <strong>${missing}</strong> not evaluated
-              <span class="pmiss-frac">(${done}/${expected})</span>
+              <span class="pmiss-frac">(${done}/${expected}${tag})</span>
             </span>`;
   }).join('');
 
