@@ -82,6 +82,23 @@ table.matrix tbody tr:nth-child(even){background:rgba(0,0,0,.012);}
 .col-unrated{color:#b14d4d!important;font-style:italic;}
 .tot{background:var(--blue-bg)!important;color:var(--blue-t);font-weight:600;}
 .llm-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle;}
+/* Persona grouping + unevaluated highlighting */
+.matrix tr.prow td.persona{background:var(--blue-bg);text-align:left;font-size:12px;
+  border-top:1.5px solid var(--blue-t);padding:7px 10px;}
+.persona-name{font-weight:700;color:var(--blue-t);}
+.pcell-miss{display:inline-block;margin-left:8px;background:#fbeaea;color:#b14d4d;border:.5px solid #e8b4b4;
+  border-radius:999px;padding:1px 9px;font-size:11px;font-weight:600;}
+.pcell-ok{display:inline-block;margin-left:8px;background:#e7f6ec;color:#2e7d46;border:.5px solid #b6dfc4;
+  border-radius:999px;padding:1px 9px;font-size:11px;font-weight:600;}
+.pcell-frac{margin-left:6px;color:var(--muted);font-size:11px;}
+.cell-miss{color:#b14d4d;font-weight:700;background:#fbeaea;border-radius:4px;padding:0 7px;}
+.cell-na{color:var(--muted-2);font-weight:400;}
+.pmiss-bar{display:flex;flex-wrap:wrap;gap:6px;margin:.2rem 0 .4rem;}
+.pmiss{font-size:11.5px;border-radius:6px;padding:3px 10px;border:.5px solid var(--border);}
+.pmiss-some{background:#fbeaea;color:#b14d4d;border-color:#e8b4b4;}
+.pmiss-none{background:#e7f6ec;color:#2e7d46;border-color:#b6dfc4;}
+.pmiss-frac{opacity:.75;font-size:10.5px;margin-left:2px;}
+.ev-chip-warn{background:#fbeaea!important;color:#b14d4d!important;border-color:#e8b4b4!important;}
 .empty{padding:3rem 1rem;text-align:center;color:var(--muted);font-size:14px;}
 </style>
 </head>
@@ -227,16 +244,31 @@ async function loadData(){
 
 function aggregate(sessions){
   EVAL={}; GLOBAL={llms:new Set(), allLlms:new Set()};
-  // Map query -> full LLM roster defined in its session (for column seeding).
-  const queryRoster={};
+  // Roster maps built from session definitions (independent of who rated what):
+  //   queryRoster[q]   = Set of LLM titles defined for that query
+  //   queryPersona[q]  = persona title that owns the query
+  //   personaQueries[p]= Set of queries belonging to the persona
+  //   personaExpected[p] = total expected evaluations (Σ over queries of #LLMs)
+  const queryRoster={}, queryPersona={}, personaQueries={}, personaExpected={};
   Object.values(sessions).forEach(s=>{
     if(!s||typeof s!=='object')return;
     const titles=sessionLlmTitles(s);
     if(!titles.length)return;
     const q=(s.query||'(no query)');
+    const p=(s.personaTitle||'Unknown persona');
     queryRoster[q]=queryRoster[q]||new Set();
     titles.forEach(t=>{ queryRoster[q].add(t); GLOBAL.allLlms.add(t); });
+    queryPersona[q]=p;
+    (personaQueries[p]=personaQueries[p]||new Set()).add(q);
   });
+  Object.entries(personaQueries).forEach(([p,qs])=>{
+    let exp=0; qs.forEach(q=>exp+=(queryRoster[q]?queryRoster[q].size:0));
+    personaExpected[p]=exp;
+  });
+  GLOBAL.queryPersona=queryPersona;
+  GLOBAL.personaQueries=personaQueries;
+  GLOBAL.personaExpected=personaExpected;
+  GLOBAL.queryRoster=queryRoster;
 
   forEachEvaluation(sessions,(s,rec)=>{
     const blocks=validLlmBlocks(rec);
@@ -245,9 +277,12 @@ function aggregate(sessions){
     const E=EVAL[key]||(EVAL[key]={
       name:rec.evaluator||rec.evaluatorEmail||'Unknown',
       email:rec.evaluatorEmail||'',
-      total:0,byQuery:{},byLlm:{},matrix:{},queries:new Set(),llms:new Set(),allLlms:new Set()
+      total:0,byQuery:{},byLlm:{},matrix:{},queries:new Set(),llms:new Set(),allLlms:new Set(),
+      personas:new Set()
     });
     const q=(s.query||'(no query)');
+    const p=(s.personaTitle||queryPersona[q]||'Unknown persona');
+    E.personas.add(p);
     // Seed this evaluator's column roster with every LLM defined for the query.
     (queryRoster[q]||new Set()).forEach(t=>E.allLlms.add(t));
     blocks.forEach(b=>{
@@ -303,26 +338,83 @@ function buildCard(e,idx){
     }
     return `<span class="llm-pill llm-pill-unrated" title="No ratings yet">${esc(llm)}<span class="n">0</span></span>`;
   }).join('');
-  // Query summary pills
-  const queryList=Object.entries(e.byQuery).sort((a,b)=>b[1]-a[1]);
-  // Matrix: rows = queries, cols = full canonical roster
+
+  // Build the set of queries to display, grouped by persona.
+  // For every persona this evaluator engaged with, show ALL of that persona's
+  // queries (from the session roster) so missing ones are visible.
+  const personaQueries=GLOBAL.personaQueries||{};
+  const queryPersona=GLOBAL.queryPersona||{};
+  const queryRoster=GLOBAL.queryRoster||{};
+
+  // Personas to display = personas the evaluator has touched.
+  const personas=[...(e.personas||new Set())].sort((a,b)=>a.localeCompare(b,'el'));
+
+  // Per-persona missing-evaluation summary (over the FULL persona roster).
+  const personaSummary=personas.map(p=>{
+    const qs=[...(personaQueries[p]||new Set())];
+    let expected=0, done=0;
+    qs.forEach(q=>{
+      const roster=queryRoster[q]||new Set();
+      roster.forEach(l=>{
+        expected++;
+        if(e.matrix[q] && e.matrix[q][l]) done++;
+      });
+    });
+    const missing=expected-done;
+    const cls=missing>0?'pmiss-some':'pmiss-none';
+    return `<span class="pmiss ${cls}" title="${done} of ${expected} evaluated">
+              ${esc(p)}: <strong>${missing}</strong> not evaluated
+              <span class="pmiss-frac">(${done}/${expected})</span>
+            </span>`;
+  }).join('');
+
+  // Matrix rows grouped by persona. Each persona shows all its queries.
+  let rows='';
+  personas.forEach(p=>{
+    const qs=[...(personaQueries[p]||new Set())].sort((a,b)=>a.localeCompare(b,'el'));
+    let pMissing=0, pExpected=0;
+    const qRows=qs.map(q=>{
+      const roster=queryRoster[q]||new Set();
+      const cells=cols.map(l=>{
+        const inRoster=roster.has(l);
+        const n=(e.matrix[q]&&e.matrix[q][l])||0;
+        if(inRoster){ pExpected++; if(!n) pMissing++; }
+        if(!inRoster) return `<td><span class="cell-na" title="LLM not part of this query">–</span></td>`;
+        if(n>0)       return `<td><span class="cell-n">${n}</span></td>`;
+        return `<td><span class="cell-n cell-miss" title="Not evaluated yet">0</span></td>`;
+      }).join('');
+      const rowTot=cols.reduce((a,l)=>a+((e.matrix[q]&&e.matrix[q][l])||0),0);
+      return `<tr><td class="q">${esc(q)}</td>${cells}<td class="tot">${rowTot}</td></tr>`;
+    }).join('');
+    const span=qs.length||1;
+    // Persona group header row spanning the query column
+    const missBadge=pMissing>0
+      ? `<span class="pcell-miss">${pMissing} not evaluated</span>`
+      : `<span class="pcell-ok">✓ complete</span>`;
+    rows+=`<tr class="prow"><td class="persona" colspan="${cols.length+2}">
+             <span class="persona-name">${esc(p)}</span> ${missBadge}
+             <span class="pcell-frac">(${pExpected-pMissing}/${pExpected} evaluated)</span>
+           </td></tr>` + qRows;
+  });
+
+  // Matrix header: Persona context is shown via group rows, first col = Query.
   const head=`<tr><th class="q">Query</th>${cols.map(l=>{
     const rated=(e.byLlm[l]||0)>0;
     return `<th${rated?'':' class="col-unrated" title="No ratings yet"'}><span class="llm-dot" style="background:${rated?(LLM_COLOR[l]||'#6b7280'):'#d99'}"></span>${esc(l)}</th>`;
   }).join('')}<th class="tot">Σύνολο</th></tr>`;
-  const rows=queryList.map(([q])=>{
-    const cells=cols.map(l=>{
-      const n=(e.matrix[q]&&e.matrix[q][l])||0;
-      return `<td><span class="cell-n${n===0?' cell-0':''}">${n||'·'}</span></td>`;
-    }).join('');
-    const rowTot=cols.reduce((a,l)=>a+((e.matrix[q]&&e.matrix[q][l])||0),0);
-    return `<tr><td class="q">${esc(q)}</td>${cells}<td class="tot">${rowTot}</td></tr>`;
-  }).join('');
   const colTotals=cols.map(l=>{
     const n=e.byLlm[l]||0;
     return `<td class="tot${n===0?' col-unrated':''}">${n}</td>`;
   }).join('');
   const footer=`<tr><td class="q tot">Σύνολο</td>${colTotals}<td class="tot">${e.total}</td></tr>`;
+
+  // Overall missing across all personas this evaluator touched.
+  let totExpected=0, totMissing=0;
+  personas.forEach(p=>{
+    [...(personaQueries[p]||new Set())].forEach(q=>{
+      (queryRoster[q]||new Set()).forEach(l=>{ totExpected++; if(!(e.matrix[q]&&e.matrix[q][l])) totMissing++; });
+    });
+  });
 
   return `
     <div class="ev-card${idx===0?' open':''}">
@@ -337,12 +429,15 @@ function buildCard(e,idx){
           <span class="ev-chip"><strong>${e.total}</strong> αξιολογήσεις</span>
           <span class="ev-chip"><strong>${e.queries.size}</strong> queries</span>
           <span class="ev-chip"><strong>${e.llms.size}/${e.allLlms.size}</strong> LLMs</span>
+          <span class="ev-chip${totMissing>0?' ev-chip-warn':''}"><strong>${totMissing}</strong> not evaluated</span>
         </div>
       </div>
       <div class="ev-body"><div class="ev-body-inner">
         <div class="sub-h">Αξιολογήσεις ανά LLM</div>
         <div class="llm-bar">${llmPills}</div>
-        <div class="sub-h">Πίνακας: Query × LLM (πλήθος αξιολογήσεων)</div>
+        <div class="sub-h">Μη αξιολογημένα ανά persona</div>
+        <div class="pmiss-bar">${personaSummary||'<span class="muted">—</span>'}</div>
+        <div class="sub-h">Πίνακας: Persona / Query × LLM (πλήθος αξιολογήσεων)</div>
         <div class="matrix-wrap">
           <table class="matrix">
             <thead>${head}</thead>
