@@ -193,7 +193,9 @@ const QUERY_Q = [
   {id:'difficulty', name:'How difficult would it be to answer the query through a simple search on SearchCulture.',
    type:'scale', opts:['1 — Very easy','2 — Relatively easy','3 — Moderate difficulty','4 — Difficult','5 — Very difficult']},
   {id:'time', name:'How much time do you estimate it would take manually through SearchCulture (in minutes).',
-   type:'number'}
+   type:'number'},
+  {id:'searchQuery', name:'Enter the corresponding query you used with the SearchCulture filters.',
+   type:'text'}
 ];
 
 let LLMS = [];                /* normalized [{title,description}] */
@@ -264,6 +266,8 @@ async function loadSession(){
           if(rec.queryEval.difficulty)    PRELOAD_Q.difficulty = rec.queryEval.difficulty;
           if(rec.queryEval.searchMinutes != null && rec.queryEval.searchMinutes !== '')
             PRELOAD_Q.time = rec.queryEval.searchMinutes;
+          if(rec.queryEval.searchQuery != null && rec.queryEval.searchQuery !== '')
+            PRELOAD_Q.searchQuery = rec.queryEval.searchQuery;
         }
         const blocks = Array.isArray(rec.llms) ? rec.llms.map((v,i)=>[i,v])
                      : (rec.llms && typeof rec.llms==='object' ? Object.entries(rec.llms) : []);
@@ -318,7 +322,11 @@ async function loadSession(){
 }
 
 function buildQueryEval(){
-  qState = { difficulty: PRELOAD_Q.difficulty || null, time: (PRELOAD_Q.time != null ? PRELOAD_Q.time : '') };
+  qState = {
+    difficulty: PRELOAD_Q.difficulty || null,
+    time: (PRELOAD_Q.time != null ? PRELOAD_Q.time : ''),
+    searchQuery: (PRELOAD_Q.searchQuery != null ? PRELOAD_Q.searchQuery : '')
+  };
   $('query-eval-grid').innerHTML = QUERY_Q.map(q => {
     if(q.type === 'scale'){
       const sel = qState[q.id];
@@ -329,6 +337,14 @@ function buildQueryEval(){
             ${q.opts.map(o=>`<button class="mco${sel===o?' sel':''}" data-q="${q.id}" data-v="${esc(o)}">${esc(o)}</button>`).join('')}
           </div>
           <div style="font-size:11px;color:var(--red);display:none;" id="qerr-${q.id}">Επιλέξτε μια απάντηση</div>
+        </div>`;
+    }
+    if(q.type === 'text'){
+      return `
+        <div class="cc">
+          <div class="ch"><div class="cname">${esc(q.name)}</div></div>
+          <input type="text" class="fi" placeholder="e.g. keyword + filters used" data-qt="${q.id}" value="${esc(qState[q.id])}" style="width:100%;max-width:560px;"/>
+          <div style="font-size:11px;color:var(--red);display:none;" id="qerr-${q.id}">Please fill in this field</div>
         </div>`;
     }
     return `
@@ -353,6 +369,12 @@ function buildQueryEval(){
     inp.addEventListener('input', e => {
       qState[e.target.dataset.qn] = e.target.value;
       if(e.target.value){ const el=$('qerr-'+e.target.dataset.qn); if(el) el.style.display='none'; }
+    });
+  });
+  document.querySelectorAll('[data-qt]').forEach(inp => {
+    inp.addEventListener('input', e => {
+      qState[e.target.dataset.qt] = e.target.value;
+      if(e.target.value.trim()){ const el=$('qerr-'+e.target.dataset.qt); if(el) el.style.display='none'; }
     });
   });
 }
@@ -486,7 +508,8 @@ $('ev-submit').addEventListener('click', async () => {
     timestamp:      now(),
     queryEval:      {
       difficulty:    qState.difficulty || '',
-      searchMinutes: (qState.time != null ? String(qState.time).trim() : '')
+      searchMinutes: (qState.time != null ? String(qState.time).trim() : ''),
+      searchQuery:   (qState.searchQuery != null ? String(qState.searchQuery).trim() : '')
     },
     llms:           {}
   };
@@ -531,6 +554,10 @@ $('ev-submit').addEventListener('click', async () => {
           <div style="background:var(--bg);border-radius:6px;padding:7px 10px;">
             <div style="font-size:10px;color:var(--muted);margin-bottom:1px;">Estimated manual search time (min)</div>
             <div style="font-size:12px;font-weight:500;">${esc((qState.time!=null&&String(qState.time).trim()!=='')?qState.time:'—')}</div>
+          </div>
+          <div style="background:var(--bg);border-radius:6px;padding:7px 10px;grid-column:1 / -1;">
+            <div style="font-size:10px;color:var(--muted);margin-bottom:1px;">SearchCulture query used</div>
+            <div style="font-size:12px;font-weight:500;">${esc((qState.searchQuery!=null&&String(qState.searchQuery).trim()!=='')?qState.searchQuery:'—')}</div>
           </div>
         </div>
       </div>`;
