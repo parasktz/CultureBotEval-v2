@@ -76,6 +76,10 @@ table.matrix td.q{color:var(--text);font-size:12px;}
 table.matrix tbody tr:nth-child(even){background:rgba(0,0,0,.012);}
 .cell-n{display:inline-block;min-width:20px;font-variant-numeric:tabular-nums;font-weight:600;}
 .cell-0{color:var(--muted-2);font-weight:400;}
+.llm-pill-unrated{background:repeating-linear-gradient(45deg,#fbeaea,#fbeaea 6px,#f7dede 6px,#f7dede 12px)!important;
+                  color:#b14d4d!important;font-style:italic;border:.5px solid #e8b4b4;}
+.llm-pill-unrated .n{background:rgba(177,77,77,.18)!important;color:#b14d4d!important;}
+.col-unrated{color:#b14d4d!important;font-style:italic;}
 .tot{background:var(--blue-bg)!important;color:var(--blue-t);font-weight:600;}
 .llm-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle;}
 .empty{padding:3rem 1rem;text-align:center;color:var(--muted);font-size:14px;}
@@ -139,6 +143,28 @@ function validLlmBlocks(rec){
   return Object.values(rec.llms).filter(llmHasRatings)
     .map(l=>({title:(l.llmTitle||'Untitled LLM').toString().trim()||'Untitled LLM'}));
 }
+/* All LLM titles DEFINED in a session (regardless of whether anyone rated them),
+   so unrated models (e.g. CultureBot v2) still appear as columns. */
+function sessionLlmTitles(s){
+  if(!s) return [];
+  let arr=s.llms;
+  if(arr&&!Array.isArray(arr)&&typeof arr==='object') arr=Object.values(arr);
+  if(!Array.isArray(arr)) return [];
+  const out=[];
+  arr.forEach(l=>{ if(!l||typeof l!=='object')return;
+    const t=(l.title||l.llmTitle||'Untitled LLM').toString().trim()||'Untitled LLM';
+    if(!out.includes(t)) out.push(t); });
+  return out;
+}
+/* Canonical column order requested for the report. Any LLM not in this list is
+   appended afterwards (alphabetically) so nothing is ever dropped. */
+const LLM_ORDER=['ChatGPT','Gemini','CultureBot v1','CultureBot v2'];
+function orderLlms(list){
+  const set=new Set(list);
+  const ordered=LLM_ORDER.filter(l=>set.has(l));
+  const rest=[...set].filter(l=>!LLM_ORDER.includes(l)).sort();
+  return [...ordered,...rest];
+}
 function forEachEvaluation(sessions, cb){
   Object.entries(sessions).forEach(([code,s])=>{
     if(!s||typeof s!=='object')return;
@@ -200,7 +226,18 @@ async function loadData(){
 }
 
 function aggregate(sessions){
-  EVAL={}; GLOBAL={llms:new Set()};
+  EVAL={}; GLOBAL={llms:new Set(), allLlms:new Set()};
+  // Map query -> full LLM roster defined in its session (for column seeding).
+  const queryRoster={};
+  Object.values(sessions).forEach(s=>{
+    if(!s||typeof s!=='object')return;
+    const titles=sessionLlmTitles(s);
+    if(!titles.length)return;
+    const q=(s.query||'(no query)');
+    queryRoster[q]=queryRoster[q]||new Set();
+    titles.forEach(t=>{ queryRoster[q].add(t); GLOBAL.allLlms.add(t); });
+  });
+
   forEachEvaluation(sessions,(s,rec)=>{
     const blocks=validLlmBlocks(rec);
     if(!blocks.length) return;
@@ -208,20 +245,22 @@ function aggregate(sessions){
     const E=EVAL[key]||(EVAL[key]={
       name:rec.evaluator||rec.evaluatorEmail||'Unknown',
       email:rec.evaluatorEmail||'',
-      total:0,byQuery:{},byLlm:{},matrix:{},queries:new Set(),llms:new Set()
+      total:0,byQuery:{},byLlm:{},matrix:{},queries:new Set(),llms:new Set(),allLlms:new Set()
     });
     const q=(s.query||'(no query)');
+    // Seed this evaluator's column roster with every LLM defined for the query.
+    (queryRoster[q]||new Set()).forEach(t=>E.allLlms.add(t));
     blocks.forEach(b=>{
       const llm=b.title;
       E.total++;
       E.byQuery[q]=(E.byQuery[q]||0)+1;
       E.byLlm[llm]=(E.byLlm[llm]||0)+1;
       (E.matrix[q]=E.matrix[q]||{})[llm]=(E.matrix[q][llm]||0)+1;
-      E.queries.add(q); E.llms.add(llm);
-      GLOBAL.llms.add(llm);
+      E.queries.add(q); E.llms.add(llm); E.allLlms.add(llm);
+      GLOBAL.llms.add(llm); GLOBAL.allLlms.add(llm);
     });
   });
-  LLM_COLOR=buildLlmColors([...GLOBAL.llms]);
+  LLM_COLOR=buildLlmColors([...GLOBAL.allLlms]);
 }
 
 function renderCards(){
@@ -232,7 +271,7 @@ function renderCards(){
     <div class="card"><div class="card-lbl">Evaluators</div><div class="card-val">${evs.length}</div></div>
     <div class="card"><div class="card-lbl">Σύνολο αξιολογήσεων</div><div class="card-val">${totalRatings}</div></div>
     <div class="card"><div class="card-lbl">Queries</div><div class="card-val">${allQ.size}</div></div>
-    <div class="card"><div class="card-lbl">LLMs</div><div class="card-val">${GLOBAL.llms.size}</div></div>`;
+    <div class="card"><div class="card-lbl">LLMs</div><div class="card-val">${GLOBAL.allLlms.size}</div></div>`;
 }
 
 function renderList(){
@@ -252,17 +291,25 @@ function renderList(){
 }
 
 function buildCard(e,idx){
-  const llms=[...e.llms].sort();
-  // LLM summary pills
-  const llmPills=Object.entries(e.byLlm).sort((a,b)=>b[1]-a[1]).map(([llm,n])=>{
-    const c=LLM_COLOR[llm]||'#6b7280';
-    return `<span class="llm-pill" style="background:${c}">${esc(llm)}<span class="n">${n}</span></span>`;
+  // Columns = full canonical roster (ChatGPT, Gemini, CultureBot v1, CultureBot v2, …),
+  // including models this evaluator hasn't rated yet.
+  const cols=orderLlms([...e.allLlms]);
+  // LLM summary pills — show every roster LLM; unrated ones get a striped style + 0.
+  const llmPills=cols.map(llm=>{
+    const n=e.byLlm[llm]||0;
+    if(n>0){
+      const c=LLM_COLOR[llm]||'#6b7280';
+      return `<span class="llm-pill" style="background:${c}">${esc(llm)}<span class="n">${n}</span></span>`;
+    }
+    return `<span class="llm-pill llm-pill-unrated" title="No ratings yet">${esc(llm)}<span class="n">0</span></span>`;
   }).join('');
   // Query summary pills
   const queryList=Object.entries(e.byQuery).sort((a,b)=>b[1]-a[1]);
-  // Matrix: rows = queries, cols = this evaluator's LLMs
-  const cols=llms;
-  const head=`<tr><th class="q">Query</th>${cols.map(l=>`<th><span class="llm-dot" style="background:${LLM_COLOR[l]||'#6b7280'}"></span>${esc(l)}</th>`).join('')}<th class="tot">Σύνολο</th></tr>`;
+  // Matrix: rows = queries, cols = full canonical roster
+  const head=`<tr><th class="q">Query</th>${cols.map(l=>{
+    const rated=(e.byLlm[l]||0)>0;
+    return `<th${rated?'':' class="col-unrated" title="No ratings yet"'}><span class="llm-dot" style="background:${rated?(LLM_COLOR[l]||'#6b7280'):'#d99'}"></span>${esc(l)}</th>`;
+  }).join('')}<th class="tot">Σύνολο</th></tr>`;
   const rows=queryList.map(([q])=>{
     const cells=cols.map(l=>{
       const n=(e.matrix[q]&&e.matrix[q][l])||0;
@@ -271,7 +318,10 @@ function buildCard(e,idx){
     const rowTot=cols.reduce((a,l)=>a+((e.matrix[q]&&e.matrix[q][l])||0),0);
     return `<tr><td class="q">${esc(q)}</td>${cells}<td class="tot">${rowTot}</td></tr>`;
   }).join('');
-  const colTotals=cols.map(l=>`<td class="tot">${e.byLlm[l]||0}</td>`).join('');
+  const colTotals=cols.map(l=>{
+    const n=e.byLlm[l]||0;
+    return `<td class="tot${n===0?' col-unrated':''}">${n}</td>`;
+  }).join('');
   const footer=`<tr><td class="q tot">Σύνολο</td>${colTotals}<td class="tot">${e.total}</td></tr>`;
 
   return `
@@ -286,7 +336,7 @@ function buildCard(e,idx){
         <div class="ev-chips">
           <span class="ev-chip"><strong>${e.total}</strong> αξιολογήσεις</span>
           <span class="ev-chip"><strong>${e.queries.size}</strong> queries</span>
-          <span class="ev-chip"><strong>${e.llms.size}</strong> LLMs</span>
+          <span class="ev-chip"><strong>${e.llms.size}/${e.allLlms.size}</strong> LLMs</span>
         </div>
       </div>
       <div class="ev-body"><div class="ev-body-inner">
