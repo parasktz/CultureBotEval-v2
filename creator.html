@@ -132,6 +132,25 @@ const esc  = s => { const d=document.createElement('div'); d.textContent=String(
 const genCode = () => Math.random().toString(36).substring(2,8).toUpperCase();
 const now = () => new Date().toLocaleString('el-GR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 
+/* ── Access control: only admins may create sessions ──────────── */
+const LINKED_UID_GROUPS = [
+  ['PKk2b99IkpYJ2koMHOAYy7CiCYG2', 'Vz5yKukvIASpJp6riiGKZ3bHBvy2']
+];
+const ADMIN_UIDS   = ['PKk2b99IkpYJ2koMHOAYy7CiCYG2', 'Vz5yKukvIASpJp6riiGKZ3bHBvy2'];
+const ADMIN_EMAILS = ['parasktz@gmail.com'];
+function linkedUids(uid){
+  for(const g of LINKED_UID_GROUPS){ if(g.includes(uid)) return g; }
+  return [uid];
+}
+async function isAdmin(uid, email){
+  const uids = linkedUids(uid);
+  if(uids.some(x => ADMIN_UIDS.includes(x)) || (email && ADMIN_EMAILS.includes(email))) return true;
+  for(const u of uids){
+    try{ const snap = await db.ref('admins/' + u).once('value'); if(snap.exists() && !!snap.val()) return true; }catch(e){}
+  }
+  return false;
+}
+
 /* Keeps entered LLM values when count changes */
 let llmData = [{ title:'', description:'' }];
 
@@ -179,8 +198,11 @@ function syncCount(){
   renderLlmFields();
 }
 
-auth.onAuthStateChanged(u => {
+auth.onAuthStateChanged(async u => {
   if(!u){ location.href='index.html'; return; }
+  // Block non-admins from direct URL access.
+  const admin = await isAdmin(u.uid, u.email);
+  if(!admin){ alert('Δεν έχεις δικαίωμα πρόσβασης σε αυτή τη σελίδα.'); location.href='role.html'; return; }
   const name = u.displayName || u.email;
   $('cr-creator').value  = name;
   $('umail').textContent = u.email;
