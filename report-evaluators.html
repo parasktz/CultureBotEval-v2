@@ -136,7 +136,7 @@ table.matrix tbody tr:nth-child(even){background:rgba(0,0,0,.012);}
 
 <div class="wrap" id="screen-app" style="display:none">
   <div class="cards" id="cards"></div>
-  <div class="sort-row">
+  <div class="sort-row" id="sort-row">
     <span>Ταξινόμηση:</span>
     <select id="sort-sel" onchange="renderList()">
       <option value="total">Πλήθος αξιολογήσεων (φθίνουσα)</option>
@@ -218,15 +218,13 @@ firebase.initializeApp(FIREBASE_CONFIG);
 const auth=firebase.auth();
 const db=firebase.database();
 
+/* Uses the existing system login — no separate sign-in on this page.
+   Any user already authenticated in the system sees the FULL report
+   (all evaluators). No admin/verified gate, no per-user scoping. */
 auth.onAuthStateChanged(async user=>{
-  if(!user){ show('screen-login'); return; }
-  let allowed=false;
-  try{const s=await db.ref('verified_creators/'+user.uid).once('value');if(s.exists())allowed=true;}catch(e){}
-  if(!allowed){try{const s=await db.ref('verified_creators').once('value');const vc=s.val()||{};Object.values(vc).forEach(v=>{if(v===true)return;if(v&&(v.email===user.email||v.uid===user.uid))allowed=true;});}catch(e){}}
-  if(!allowed){try{const s=await db.ref('admins/'+user.uid).once('value');if(s.exists())allowed=true;}catch(e){}}
-  document.getElementById('user-email').textContent=user.email;
-  document.getElementById('logout-btn').style.display='inline-block';
-  if(!allowed){ show('screen-denied'); return; }
+  if(!user){ show('screen-login'); return; }   // only reached if not logged in anywhere
+  const ue=document.getElementById('user-email'); if(ue) ue.textContent=user.email||'';
+  const lo=document.getElementById('logout-btn'); if(lo) lo.style.display='inline-block';
   await loadData();
 });
 
@@ -313,7 +311,10 @@ function renderCards(){
 function renderList(){
   const sortBy=document.getElementById('sort-sel').value;
   let evs=Object.entries(EVAL).map(([k,e])=>({k,...e}));
-  if(!evs.length){ document.getElementById('ev-list').innerHTML='<div class="empty">📭 Καμία αξιολόγηση ακόμη.</div>'; return; }
+  if(!evs.length){
+    document.getElementById('ev-list').innerHTML='<div class="empty">📭 Καμία αξιολόγηση ακόμη.</div>';
+    return;
+  }
   evs.sort((a,b)=>{
     if(sortBy==='name') return a.name.localeCompare(b.name,'el');
     if(sortBy==='queries') return b.queries.size-a.queries.size || b.total-a.total;
