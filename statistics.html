@@ -242,39 +242,10 @@ const db   = firebase.database();
 auth.onAuthStateChanged(async user => {
   if(!user){ show('screen-login'); return; }
 
-  let allowed = false;
-  try { const snap = await db.ref('verified_creators/' + user.uid).once('value'); if(snap.exists()) allowed = true; } catch(e){}
-  if(!allowed){
-    try {
-      const snap = await db.ref('verified_creators').once('value');
-      const vc = snap.val() || {};
-      Object.values(vc).forEach(v => {
-        if(v === true) return;
-        if(v && (v.email === user.email || v.uid === user.uid)) allowed = true;
-      });
-    } catch(e){}
-  }
-  if(!allowed){
-    // Robust admin check: linked accounts + uid/email fallback
-    const LINKED=[['PKk2b99IkpYJ2koMHOAYy7CiCYG2','Vz5yKukvIASpJp6riiGKZ3bHBvy2']];
-    const ADMIN_UIDS=['PKk2b99IkpYJ2koMHOAYy7CiCYG2','Vz5yKukvIASpJp6riiGKZ3bHBvy2'];
-    const ADMIN_EMAILS=['parasktz@gmail.com'];
-    let uids=[user.uid];
-    for(const g of LINKED){ if(g.includes(user.uid)){ uids=g; break; } }
-    if(uids.some(x=>ADMIN_UIDS.includes(x)) || (user.email && ADMIN_EMAILS.includes(user.email))){
-      allowed = true;
-    }
-    if(!allowed){
-      for(const u of uids){
-        try { const snap = await db.ref('admins/' + u).once('value'); if(snap.exists() && !!snap.val()){ allowed = true; break; } } catch(e){}
-      }
-    }
-  }
-
+  // Statistics are open to ALL logged-in users (no admin/verified-creator gate).
   document.getElementById('user-email').textContent = user.email;
   document.getElementById('logout-btn').style.display = 'inline-block';
 
-  if(!allowed){ show('screen-denied'); return; }
   await loadData();
 });
 
