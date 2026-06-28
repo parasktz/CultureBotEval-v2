@@ -54,12 +54,12 @@
       <p>Επίλεξε πώς θέλεις να συμμετέχεις σήμερα.</p>
     </div>
     <div class="role-cards">
-      <div class="role-card" onclick="location.href='creator.html'">
+      <div class="role-card" id="card-create" style="display:none" onclick="location.href='creator.html'">
         <div class="role-card-icon">🟦</div>
         <div class="role-card-title">Create</div>
         <div class="role-card-desc">Δημιούργησε νέο session με persona, query και ένα ή περισσότερα LLMs.</div>
       </div>
-      <div class="role-card" onclick="location.href='modify.html'">
+      <div class="role-card" id="card-modify" style="display:none" onclick="location.href='modify.html'">
         <div class="role-card-icon">✏️</div>
         <div class="role-card-title">Modify</div>
         <div class="role-card-desc">Επεξεργάσου ή διέγραψε sessions που δημιούργησες.</div>
@@ -74,7 +74,7 @@
         <div class="role-card-title">Statistics</div>
         <div class="role-card-desc">Δες τα αναλυτικά διαγράμματα.</div>
       </div>
-      <div class="role-card" onclick="location.href='admin.html'">
+      <div class="role-card" id="card-admin" style="display:none" onclick="location.href='admin.html'">
         <div class="role-card-icon">⚙️</div>
         <div class="role-card-title">Admin pages</div>
         <div class="role-card-desc">Μόνο για διαχειριστές.</div>
@@ -86,16 +86,45 @@
 <script src="config.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script>
 firebase.initializeApp(FIREBASE_CONFIG);
 const auth = firebase.auth();
+const db   = firebase.database();
 const $ = id => document.getElementById(id);
 
-auth.onAuthStateChanged(u => {
+/* ── Admin check (same mechanism as admin.html) ───────────────── */
+const LINKED_UID_GROUPS = [
+  ['PKk2b99IkpYJ2koMHOAYy7CiCYG2', 'Vz5yKukvIASpJp6riiGKZ3bHBvy2']
+];
+const ADMIN_UIDS   = ['PKk2b99IkpYJ2koMHOAYy7CiCYG2', 'Vz5yKukvIASpJp6riiGKZ3bHBvy2'];
+const ADMIN_EMAILS = ['parasktz@gmail.com'];
+function linkedUids(uid){
+  for(const g of LINKED_UID_GROUPS){ if(g.includes(uid)) return g; }
+  return [uid];
+}
+async function isAdmin(uid, email){
+  const uids = linkedUids(uid);
+  if(uids.some(x => ADMIN_UIDS.includes(x)) || (email && ADMIN_EMAILS.includes(email))) return true;
+  for(const u of uids){
+    try{ const snap = await db.ref('admins/' + u).once('value'); if(snap.exists() && !!snap.val()) return true; }catch(e){}
+  }
+  return false;
+}
+
+auth.onAuthStateChanged(async u => {
   if(!u){ location.href='index.html'; return; }
   const name = u.displayName || u.email;
   $('umail').textContent = u.email;
   $('av').textContent    = name.trim().split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+
+  // Create / Modify / Admin are visible only to admins; Statistics & Evaluation stay open to all.
+  const admin = await isAdmin(u.uid, u.email);
+  if(admin){
+    $('card-create').style.display = '';
+    $('card-modify').style.display = '';
+    $('card-admin').style.display  = '';
+  }
 });
 
 $('btn-out').addEventListener('click', async () => {
