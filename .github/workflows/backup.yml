@@ -1,0 +1,58 @@
+name: Backup RTDB to Google Drive
+
+# Runs every day at 02:30 UTC, and can also be triggered manually.
+on:
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch: {}   # lets you run it on-demand from the Actions tab
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rtdb-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: scripts
+        run: npm install --no-audit --no-fund
+
+      - name: Run backup
+        working-directory: scripts
+        env:
+          SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          DATABASE_URL: ${{ secrets.RTDB_URL }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          RETENTION_DAYS: '30'
+        run: node backup-to-drive.js
+
+      # ── Failure notification (Slack) ───────────────────────────────
+      # Fires ONLY if a previous step failed. Optional: if SLACK_WEBHOOK_URL
+      # is not set, the step is skipped (no error).
+      - name: Notify Slack on failure
+        if: failure() && env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          PAYLOAD=$(cat <<JSON
+          {
+            "text": "🔴 *Firebase backup FAILED*\n*Repo:* ${GITHUB_REPOSITORY}\n*Workflow:* ${GITHUB_WORKFLOW}\n*Run:* ${RUN_URL}\nThe daily RTDB to Google Drive backup did not complete. Please check the logs."
+          }
+          JSON
+          )
+          curl -sS -X POST -H 'Content-type: application/json' \
+            --data "${PAYLOAD}" "${SLACK_WEBHOOK_URL}" || echo "Slack notify failed (non-fatal)."
