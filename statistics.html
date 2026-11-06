@@ -138,6 +138,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   <div class="tabs">
     <button class="tab active" data-tab="t1" onclick="switchTab('t1')">By Persona / Query</button>
     <button class="tab" data-tab="t2" onclick="switchTab('t2')">By Query — LLM Ratings</button>
+    <button class="tab" data-tab="t3" onclick="switchTab('t3')">By Criterion (all queries)</button>
+    <button class="tab" data-tab="t4" onclick="switchTab('t4')">By Persona — Criteria</button>
     <a class="tab" href="report-evaluators.html" style="text-decoration:none;margin-left:auto;">By Evaluator →</a>
   </div>
 
@@ -153,6 +155,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     </div>
     <div class="legend-note">Each chart shows how evaluators rated every LLM on a criterion. Bars = number of evaluations choosing each option.</div>
     <div id="t2-body"></div>
+  </div>
+
+  <div class="tab-panel" id="t3">
+    <div class="cards" id="t3-cards"></div>
+    <div class="legend-note">Each chart aggregates <strong>all queries and all personas</strong> for that criterion. Bars = number of evaluations choosing each option, per LLM.</div>
+    <div id="t3-body"></div>
+  </div>
+
+  <div class="tab-panel" id="t4">
+    <div class="qsel">
+      <label for="p-select">Select a persona</label>
+      <select id="p-select" onchange="renderTab4()"></select>
+    </div>
+    <div class="legend-note">Each chart aggregates <strong>all queries of the selected persona</strong> for that criterion. Bars = number of evaluations choosing each option, per LLM.</div>
+    <div id="t4-body"></div>
   </div>
 </div>
 
@@ -257,6 +274,8 @@ async function loadData(){
     show('screen-app');
     try { buildTab1(); } catch(e){ console.error('[statistics] Tab1 failed', e); }
     try { buildTab2Selector(); } catch(e){ console.error('[statistics] Tab2 failed', e); }
+    try { buildTab3(); } catch(e){ console.error('[statistics] Tab3 failed', e); }
+    try { buildTab4Selector(); } catch(e){ console.error('[statistics] Tab4 failed', e); }
   }catch(e){
     console.error('[statistics] load failed', e);
     document.getElementById('screen-loading').innerHTML =
@@ -528,6 +547,147 @@ function renderCriteria(){
       charts.push(chart);
     }catch(e){ console.error('chart render failed', e); }
   });
+}
+
+/* ── Shared: render one bar-chart per criterion into a container ──
+   dist[criterionId][llmTitle][option] = count
+   Produces the same grouped-by-LLM bar charts used in Tab 2.         */
+function renderCriteriaCharts(bodyEl, dist, llms, ratedLlms, prefix, chartStore){
+  chartStore.forEach(c=>{ try{c.destroy();}catch(e){} });
+  chartStore.length = 0;
+
+  if(!llms.length){
+    bodyEl.innerHTML = '<div class="empty">No LLMs defined yet.</div>';
+    return;
+  }
+  if(!ratedLlms.size){
+    bodyEl.innerHTML = '<div class="empty">📭 No ratings submitted yet.</div>';
+    return;
+  }
+
+  bodyEl.innerHTML = CRITERIA.map(c=>{
+    let tot = 0;
+    llms.forEach(l=>{ const d = dist[c.id][l]; if(d) Object.values(d).forEach(n=>tot+=n); });
+    return `
+      <div class="crit-block">
+        <div class="crit-head">${c.id}. ${esc(c.name)}</div>
+        <div class="crit-sub">${tot} rating${tot!==1?'s':''} · distribution per LLM</div>
+        <div class="chart-holder"><canvas id="${prefix}-${c.id}"></canvas></div>
+      </div>`;
+  }).join('');
+
+  if(typeof Chart === 'undefined'){
+    bodyEl.innerHTML = '<div class="empty">Δεν ήταν δυνατή η φόρτωση των γραφημάτων (Chart.js). Δοκιμάστε ανανέωση.</div>';
+    return;
+  }
+
+  CRITERIA.forEach(c=>{
+    const labels = c.opts;
+    const datasets = llms.map((llm,idx)=>({
+      label: llm,
+      data: labels.map(opt => (dist[c.id][llm] && dist[c.id][llm][opt]) || 0),
+      backgroundColor: LLM_COLORS[idx % LLM_COLORS.length],
+      borderRadius: 3,
+      maxBarThickness: 38
+    }));
+    const ctx = document.getElementById(prefix+'-'+c.id);
+    if(!ctx) return;
+    try{
+      chartStore.push(new Chart(ctx, {
+        type:'bar',
+        data:{ labels, datasets },
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          plugins:{
+            legend:{ position:'bottom', labels:{ boxWidth:12, font:{size:11} } },
+            tooltip:{ callbacks:{ label: ctx => ` ${ctx.dataset.label}: ${ctx.raw} eval${ctx.raw===1?'':'s'}` } }
+          },
+          scales:{
+            y:{ beginAtZero:true, ticks:{ precision:0, font:{size:10} }, title:{display:true,text:'# evaluations',font:{size:10}} },
+            x:{ ticks:{ font:{size:10} } }
+          }
+        }
+      }));
+    }catch(e){ console.error('chart render failed', e); }
+  });
+}
+
+/* Aggregate rating distributions over a filtered set of sessions.
+   predicate(session) decides which sessions to include (default: all). */
+function aggregateDist(predicate){
+  const dist = {}; CRITERIA.forEach(c=>dist[c.id]={});
+  const llmSet = new Set(), ratedLlms = new Set(), evaluatorSet = new Set();
+  let totalResponses = 0;
+
+  // Seed roster so unrated models still appear as a (zero) series
+  Object.values(SESSIONS).forEach(s=>{
+    if(!s || typeof s!=='object') return;
+    if(predicate && !predicate(s)) return;
+    sessionLlmTitles(s).forEach(t=>llmSet.add(t));
+  });
+
+  forEachEvaluation(SESSIONS, (s, rec)=>{
+    if(predicate && !predicate(s)) return;
+    const blocks = validLlmBlocks(rec);
+    if(blocks.length) evaluatorSet.add(rec.evaluatorUid || rec.evaluatorEmail || rec.evaluator || 'anon');
+    blocks.forEach(block=>{
+      llmSet.add(block.title); ratedLlms.add(block.title);
+      totalResponses += 1;
+      CRITERIA.forEach(c=>{
+        const val = block.ratings[c.id];
+        if(!val) return;
+        if(!dist[c.id][block.title]) dist[c.id][block.title] = {};
+        dist[c.id][block.title][val] = (dist[c.id][block.title][val]||0) + 1;
+      });
+    });
+  });
+
+  return { dist, llms:[...llmSet].sort(), ratedLlms, evaluatorSet, totalResponses };
+}
+
+/* ── TAB 3 — By Criterion (all queries, all personas) ── */
+let charts3 = [];
+function buildTab3(){
+  const A = aggregateDist(null);
+  const queryCount = (()=>{ const qs=new Set(); Object.values(SESSIONS).forEach(s=>{ if(s&&typeof s==='object'&&sessionLlmTitles(s).length) qs.add(s.query||'(no query)'); }); return qs.size; })();
+  document.getElementById('t3-cards').innerHTML = `
+    <div class="card"><div class="card-lbl">Queries</div><div class="card-val">${queryCount}</div></div>
+    <div class="card"><div class="card-lbl">LLMs</div><div class="card-val">${A.llms.length}</div></div>
+    <div class="card"><div class="card-lbl">LLM ratings</div><div class="card-val">${A.totalResponses}</div></div>
+    <div class="card"><div class="card-lbl">Unique evaluators</div><div class="card-val">${A.evaluatorSet.size}</div></div>`;
+  renderCriteriaCharts(document.getElementById('t3-body'), A.dist, A.llms, A.ratedLlms, 'chart3', charts3);
+}
+
+/* ── TAB 4 — By Persona (all its queries), per criterion ── */
+let charts4 = [];
+function buildTab4Selector(){
+  const personas = new Set();
+  Object.values(SESSIONS).forEach(s=>{
+    if(!s || typeof s!=='object') return;
+    if(!sessionLlmTitles(s).length) return;
+    personas.add(s.personaTitle || 'Unknown persona');
+  });
+  const names = [...personas].sort();
+  const sel = document.getElementById('p-select');
+  if(!names.length){
+    sel.innerHTML = '<option>No personas yet</option>';
+    document.getElementById('t4-body').innerHTML = '<div class="empty">📭 No completed evaluations yet.</div>';
+    return;
+  }
+  sel.innerHTML = names.map(p=>`<option value="${esc(p)}">${esc(p.length>90?p.slice(0,90)+'…':p)}</option>`).join('');
+  renderTab4();
+}
+
+function renderTab4(){
+  const sel = document.getElementById('p-select');
+  const persona = sel.value;
+  const A = aggregateDist(s => (s.personaTitle || 'Unknown persona') === persona);
+  const qs = new Set();
+  Object.values(SESSIONS).forEach(s=>{ if(s&&typeof s==='object'&&(s.personaTitle||'Unknown persona')===persona&&sessionLlmTitles(s).length) qs.add(s.query||'(no query)'); });
+  const tag = `<div class="persona-tag">Persona: <strong>${esc(persona)}</strong> · <strong>${qs.size}</strong> quer${qs.size!==1?'ies':'y'} · <strong>${A.evaluatorSet.size}</strong> evaluator${A.evaluatorSet.size!==1?'s':''} · <strong>${A.totalResponses}</strong> LLM ratings</div>`;
+  const body = document.getElementById('t4-body');
+  body.innerHTML = tag + '<div id="t4-charts"></div>';
+  renderCriteriaCharts(document.getElementById('t4-charts'), A.dist, A.llms, A.ratedLlms, 'chart4', charts4);
 }
 </script>
 
